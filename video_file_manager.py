@@ -22,6 +22,12 @@ class EncryptionManager:
         decrypt_file: Decrypts a file using the encryption key
     '''
     def generate_encryption_key(self):
+        '''
+        Generates a new Fernet encryption key and saves it to a file.
+        
+        returns:
+            The generated encryption key (bytes) or None if generation failed
+        '''
         try:
             key = Fernet.generate_key()
             key_location = os.getenv('PATH_TO_KEY')
@@ -34,6 +40,10 @@ class EncryptionManager:
             return None
     
     def get_encryption_key(self):
+        ''' Reads the encryption key from file.
+        returns:
+            The encryption key (bytes) or raises an exception if it cannot be read
+        '''
         try:
             load_dotenv()
             key_location = os.getenv('PATH_TO_KEY')
@@ -59,6 +69,11 @@ class EncryptionManager:
             raise
         
     def encrypt_file(self, file_path, key):
+        ''' Encrypts a file using the provided encryption key.
+        takes:
+            file_path: Path to the file to encrypt
+            key: Encryption key (bytes) to use for encryption
+        '''
         fernet = Fernet(key)
         try:
             with open(file_path, 'rb') as file:
@@ -77,6 +92,11 @@ class EncryptionManager:
         os.remove(file_path)
     
     def decrypt_file(self, encrypted_file_path, key):
+        ''' Decrypts a file using the provided encryption key.
+        takes:
+            encrypted_file_path: Path to the encrypted file
+            key: Encryption key (bytes) to use for decryption
+        returns: The path to the decrypted file or None if decryption failed'''
         
         fernet = Fernet(key)
         
@@ -112,6 +132,22 @@ class EncryptionManager:
 
 
 class VideoManager(EncryptionManager):
+    '''
+    Manages video files including downloading from S3, organizing, quality checking, 
+    and encryption/decryption. Inherits from EncryptionManager for encryption functionality.
+    
+    Atributes:
+        session: Boto3 session for S3 interactions
+        s3: Boto3 S3 client for file operations
+    
+    Methods:
+        download_all: Downloads and encrypts all videos from S3 bucket
+        orginise_videos: Organizes encrypted videos into letter-based folders
+        delete_video: Deletes a specified video file
+        loopthroughcorpus: Encrypts all unencrypted videos in a directory
+        quality_check: Provides a GUI for quality checking and categorizing videos
+        submission_check: Extracts unique submission IDs from video filenames
+    '''
     def __init__(self):
         load_dotenv()
         self.session = boto3.Session(
@@ -122,7 +158,12 @@ class VideoManager(EncryptionManager):
             endpoint_url=os.getenv('R2_ENDPOINT'))
 
     def download_all(self, directory):
-        # check if directory exists
+        ''' Downloads all .mp4 videos from the specified S3 bucket, 
+            encrypts them, and saves to the local directory.
+        takes:
+            directory: Local directory to save the encrypted video files
+        '''
+        
         if not os.path.exists(directory):
             os.makedirs(directory)
 
@@ -148,7 +189,7 @@ class VideoManager(EncryptionManager):
                     print("loading file: ", key)
                     if key.endswith('.mp4'):
                         try:
-                            # Download to memory buffer
+                            # download to memory buffer
                             from io import BytesIO
                             buffer = BytesIO()
                             self.s3.download_fileobj(self.bucket_name, key, buffer)
@@ -156,7 +197,7 @@ class VideoManager(EncryptionManager):
                             buffer.seek(0)
                             file_data = buffer.read()
                             
-                            # Encrypt in memory
+                            # encrypt in memory
                             encrypted_data = fernet.encrypt(file_data)
                             
                             flat_filename = key.replace('/', '_') + '.encrypted'
@@ -179,7 +220,13 @@ class VideoManager(EncryptionManager):
             raise
 
     def orginise_videos(self, unorginised_directory, orginised_directory):
-        # Ensure the orginised directory exists
+        ''' Organizes encrypted video files into letter-based folders.
+        takes:
+            unorginised_directory: Directory containing unorganized encrypted video files
+            orginised_directory: Directory to save organized video files into
+        '''
+        
+        # ensure the orginised directory exists
         if not os.path.exists(orginised_directory):
             os.makedirs(orginised_directory)
         
@@ -208,6 +255,9 @@ class VideoManager(EncryptionManager):
                 print(f'Moved {source_path} to {target_path}')
 
     def delete_video(self, file_path):
+        ''' Deletes a specified video file.
+        takes:
+            file_path: Path to the video file to delete'''
         if os.path.exists(file_path):
             os.remove(file_path)
             print(f"Deleted {file_path}")
@@ -216,6 +266,9 @@ class VideoManager(EncryptionManager):
         return
             
     def loopthroughcorpus(self, directory):
+        ''' Encrypts all unencrypted .mp4 video files in the specified directory and its subdirectories.
+        takes:
+            directory: Path to the directory to search for unencrypted video files'''
         for root, dirs, files in os.walk(directory):
             for file in files:
                 if file.endswith('.mp4'):
@@ -225,12 +278,16 @@ class VideoManager(EncryptionManager):
                     self.encrypt_file(file_path, encryption_key)
 
     def quality_check(self, directory):
-        # Collect all encrypted video files from letter folders
+        ''' Provides a GUI for quality checking and categorizing encrypted video files.
+        takes:
+            directory: Path to the directory containing encrypted video files organized in letter-based folders
+        '''
+        # collect all encrypted video files from letter folders
         video_files = []
         SKIP_DIRS = {"valid", "needs_attention", "damaged_inappropriate"}
         
         for root, dirs, files in os.walk(directory):
-            # Skip category directories
+            # skip category directories
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
 
             for file in files:
@@ -315,7 +372,16 @@ class VideoManager(EncryptionManager):
 
     def _show_video_player(self, video_path, letter, encrypted_path, encryption_key, 
                         on_valid, on_needs_attention, on_damaged):
-        
+        ''' Displays a video player window with buttons for categorizing the video.
+        takes:
+            video_path: Path to the decrypted video file to play
+            letter: The letter associated with the video (for display purposes)
+            encrypted_path: Path to the original encrypted video file (for re-encryption)
+            encryption_key: The encryption key to use for re-encryption
+            on_valid: Callback function to call when "Valid" button is clicked
+            on_needs_attention: Callback function to call when "Needs Attention" button is clicked
+            on_damaged: Callback function to call when "Damaged/Inappropriate" button is clicked
+        '''
         # Create window
         window = tk.Tk()
         window.title(f"Quality Check - Letter: {letter}")
@@ -458,7 +524,9 @@ class VideoManager(EncryptionManager):
         window.mainloop()
                     
     def submission_check(self, directory):
-        # adds all submission encrypted videos to a list Ids found to list
+        ''' adds all submission encrypted videos to a list Ids found to list submission_ids.txt
+        takes:
+            directory: Path to the directory containing encrypted video files organized in letter-based folders'''
         submission_ids = set()
         for root, dirs, files in os.walk(directory):
             for file in files:
