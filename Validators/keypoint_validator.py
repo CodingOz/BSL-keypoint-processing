@@ -4,7 +4,7 @@ import traceback
 import os
 import numpy as np
 
-from validation_helpers import *
+from helpers.validation_helpers import *
 from Kalman_filter import HandPositionKalmanFilter 
 from scipy.interpolate import CubicSpline, interp1d
 from dataclasses import dataclass
@@ -47,20 +47,21 @@ class KeyPointValidator:
             print(f"Failed to read/parse JSON file '{filepath}': {e}")
             return 1
         
-        # private attributes to store computed values for reuse       
+        # private attributes to store computed values for reuse
         self.__palms = None
         self.__momentums = None
         self.__accelerations = None
         
         self.filepath = filepath
         
+        self.frames = self.data.get('frames', [])
+
     def checkForSimultaneousHands(self, showLogs = False):
-        frames = self.data.get('frames', [])
         found_error = False
         
         errors = []
 
-        for frame in frames:
+        for frame in self.frames:
             frame_index = frame.get('frame_index')
             timestamp = frame.get('timestamp')
             hands = frame.get('hands', {})
@@ -93,12 +94,11 @@ class KeyPointValidator:
         return errors
     
     def checkForMissingHands(self, showLogs=False):
-        frames = self.data.get('frames', [])
         found_error = False
         
         errors = []
 
-        for frame in frames:
+        for frame in self.frames:
             frame_index = frame.get('frame_index')
             timestamp = frame.get('timestamp')
             hands = frame.get('hands', {})
@@ -114,13 +114,12 @@ class KeyPointValidator:
     
     def viewFrame(self, filepath, frame_index):
 
-        frames = self.data.get('frames', [])
         
-        if frame_index < 0 or frame_index >= len(frames):
-            print(f"Frame index {frame_index} out of range. Total frames: {len(frames)}")
+        if frame_index < 0 or frame_index >= len(self.frames):
+            print(f"Frame index {frame_index} out of range. Total frames: {len(self.frames)}")
             return
         
-        frame = frames[frame_index]
+        frame = self.frames[frame_index]
         print(json.dumps(frame, indent=2))
         
    # ------ setter functions for palm centers, momentum and acceleration --------
@@ -130,8 +129,7 @@ class KeyPointValidator:
         # (landmark_id in [0, 1, 2, 5, 9, 13, 17]) for each hand
         # in the specified frame
         try:
-            frames = self.data.get('frames', [])
-            frame = frames[frameIdx]
+            frame = self.frames[frameIdx]
             hands = frame.get('hands', {})
             palmCenters = {}
             
@@ -159,10 +157,9 @@ class KeyPointValidator:
             return {}
 
     def findAllPalmCenters(self, showLogs=False):
-        frames = self.data.get('frames', [])
         self.__palms = []
         
-        for i in range(len(frames)):
+        for i in range(len(self.frames)):
             self.palmCenters = self.findPalmCenters(i, showLogs=showLogs)
             self.__palms.append(self.palmCenters)
         
@@ -209,9 +206,8 @@ class KeyPointValidator:
 
     def storeMomentum(self, showLogs=False):
         # stores the momentum values in an array as a class atribute
-        frames = self.data.get('frames', [])
         self.__momentums = []
-        for i in range(len(frames)-1):
+        for i in range(len(self.frames)-1):
             if self.__palms is None:
                 self.findAllPalmCenters(showLogs=showLogs)
             
@@ -236,10 +232,7 @@ class KeyPointValidator:
                 - 'acceleration': dict with acceleration metrics per hand
                 - 'estimated': dict marking which values are estimated (True/False per hand per frame)
         """
-        
-        
-        frames = self.data.get('frames', [])
-        
+                
         if not self.__momentums:
             self.storeMomentum()
         
@@ -291,9 +284,8 @@ class KeyPointValidator:
         }
         
     def storeAccelerations(self):
-        frames = self.data.get('frames', [])
         self.__accelerations = []
-        for i in range(len(frames)-2):
+        for i in range(len(self.frames)-2):
             if self.__palms is None:
                 self.findAllPalmCenters()
             palms = self.__palms[i] if i < len(self.__palms) \
@@ -339,8 +331,7 @@ class KeyPointValidator:
         if self.__palms is None:
             self.findAllPalmCenters()
         
-        frames = self.data.get('frames', [])
-        total_frames = len(frames)
+        total_frames = len(self.frames)
         
         # Initialize tracking variables
         first_hand = None
@@ -411,6 +402,29 @@ class KeyPointValidator:
             lenth_with_hands=length_with_hands
         )
             
+    
+    def findMissingValueClusters(self):
+        '''Using the missing frames to find the boundrys of empty space
+        return:
+            left_boundrys: list of boundry points
+            right_boundrys: list of boundry points
+            (a point i means that the boundry is between i and i + 1)
+        '''
+        left_boundrys = []
+        right_boundrys = []
+        
+        missing = self.checkForMissingHands()
+        left_currently = True if (0, 'left') in missing else False
+        right_currently = True if (0, 'right') in missing else False
+        for i in range(len(self.frames)):
+            left_missing = (i, 'left') in missing
+            right_missing = (i, 'right') in missing
+            
+            if left_missing ^ left_currently:
+                left_boundrys.append(i-1)
+            if right_missing ^ right_currently:
+                right_boundrys.append(i-1)
+        return left_boundrys, right_boundrys
 
 
 class KalmanKeyPointEstimator(KeyPointValidator):
@@ -428,7 +442,6 @@ class KalmanKeyPointEstimator(KeyPointValidator):
         
         Kalman filter must predict() all frames, then update() if measurement exists
         """
-        frames = self.data.get('frames', [])
         filled_centers = []
         estimation_flags = []
         
@@ -448,7 +461,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
             measurement_noise=0.005
         )
         
-        for i in range(len(frames)):
+        for i in range(len(self.frames)):
             palmCenters = self._KeyPointValidator__palms[i]
             
             filled_frame = {'left': [None, None], 'right': [None, None]}
@@ -524,10 +537,10 @@ class KalmanKeyPointEstimator(KeyPointValidator):
             left_estimated = sum(1 for e in estimation_flags if e['left'])
             right_estimated = sum(1 for e in estimation_flags if e['right'])
             print(f"\nEstimation summary:")
-            print(f"  Left hand: {left_estimated}/{len(frames)} frames estimated "
-                  f"({100*left_estimated/len(frames):.1f}%)")
-            print(f"  Right hand: {right_estimated}/{len(frames)} frames estimated "
-                  f"({100*right_estimated/len(frames):.1f}%)")
+            print(f"  Left hand: {left_estimated}/{len(self.frames)} frames estimated "
+                  f"({100*left_estimated/len(self.frames):.1f}%)")
+            print(f"  Right hand: {right_estimated}/{len(self.frames)} frames estimated "
+                  f"({100*right_estimated/len(self.frames):.1f}%)")
         
         return filled_centers, estimation_flags
     
@@ -586,7 +599,6 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         if method in self.methods:
             self.method = method
 
-    
     def interpolate_sequence(self, positions):
         # Separate into known and unknown
         frames = np.arange(len(positions))
@@ -707,18 +719,60 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
                                                           palms2, 
                                                           palms3, 
                                                           showLogs=showLogs))
-        
         return accelerations
     
     def getEstimatedAccelerations(self):
         if self.__accelerationsEstimated is None:
             self.__accelerationsEstimated = self.estimateMissingAccelerations()
         return self.__accelerationsEstimated
+    
+    def findMovmentClusters(self, max_momentum=0):
+        '''Uses momentum spikes to find the boundrys between clusters
+           of hand frames with resmables movement 
+           This is a marker for poptencaly problimatice frames
 
+        returns:
+            left_boundrys: list of boundry points
+            right_boundrys: list of boundry points
+            (a point i means that the boundry is between i and i + 1)
+            ^^^^^^^^
+            DONT FORGET THIS YOU DUMBASS
+        '''
+        momentums = self.getEstimatedMomentums()
+        left_boundrys = []
+        right_boundrys = []
+        
+        for i in range(len(momentums) - 1):
+            # Check left hand momentum
+            left_mag_curr = momentums[i]['left']['magnitude']
+            left_mag_next = momentums[i + 1]['left']['magnitude']
+            
+            if left_mag_curr > max_momentum and left_mag_next > max_momentum:
+                left_boundrys.append(i + 1)
+            
+            # Check right hand momentum
+            right_mag_curr = momentums[i]['right']['magnitude']
+            right_mag_next = momentums[i + 1]['right']['magnitude']
+            
+            if right_mag_curr > max_momentum and right_mag_next > max_momentum:
+                right_boundrys.append(i + 1)
+        
+        return left_boundrys, right_boundrys
+        
 if __name__ == "__main__":
+    
     path = r'C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\3e9dd7e5-f6a3-4b1f-9f29-9fba66f0b73c.json'
+    path = r"C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\acf7a090-7ece-488a-a6e8-f4df878629a9.json"
 
-    validator = KeyPointValidator(path)
+    validator = CubicSplineKeyPointInterpolator(path)
+    
+    print()
+    
+    left_missing, right_missing = validator.findMissingValueClusters()
+    left_fast, right_fast = validator.findMovmentClusters()
+    
+    print('missing values\n',left_missing, '\n\n', 'movment\n', len(left_fast))
+    
     '''
     frame = 66
     
@@ -735,7 +789,7 @@ if __name__ == "__main__":
     estimator = KalmanKeyPointEstimator(path)
     filled_palms, estimation_flags = estimator.estimateMissingPalmCenters()
     print(f"Total frames: {filled_palms[frame]}")
-    '''
+    
     
     estimator = KalmanKeyPointEstimator(path)
     print("\nFilled palm centers with estimation:")
@@ -747,4 +801,4 @@ if __name__ == "__main__":
     print(f"Total momentums: {len(estimated_momentums)}")
     print("\nEstimated accelerations:")
     estimated_accelerations = estimator.getEstimatedAccelerations()
-    print(f"Total accelerations: {len(estimated_accelerations)}")
+    print(f"Total accelerations: {len(estimated_accelerations)}")'''

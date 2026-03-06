@@ -12,44 +12,40 @@ class DataCleaner:
                 self.validator = CubicSplineKeyPointInterpolator(path)
 
         except Exception as e:
-            print(f"Failed to read/parse JSON file '{path}': {e}")
+            print(f"Failed to read/parse json file '{path}': {e}")
             return 1
-        
-
-       
-       
-    # ---------------------- operations on hands ------------------
-    
+            
     def deleteHandPoint(self, hand, duplicate=None):
         # hand is tuple (frame, side)
         # duplicate 
         pass
     
-    
-    
-    
-    
-     
-    def manageSimultaneousHands(self):
+    def handleSimultaneousHands(self):
+        
         duplicate_hands = self.validator.checkForSimultaneousHands()
         missing_hands = self.validator.checkForMissingHands()
-        print(duplicate_hands, "\n\n")
-        print(missing_hands)
         
         temp = copy.deepcopy(self.current)
-        
         
         for hand in duplicate_hands:
             frame_idx, side = hand
             swapped = (frame_idx, 'right' if side == 'left' else 'left')
             if swapped in missing_hands:
                 pass
-            
-                
-                
-                
-        
-                
+    
+    def handleAnomalousFrames(self):
+        pass
+    
+    def distectAnomalousFrames(self):
+        '''
+        returns:
+            list of tuples holding frame index and hand
+        '''
+        pass
+    
+
+
+    
 
 path = r"C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\acf7a090-7ece-488a-a6e8-f4df878629a9.json"
 

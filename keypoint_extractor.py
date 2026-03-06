@@ -8,7 +8,8 @@ from video_file_manager import VideoManager
 import subprocess
 from PIL import Image
 import numpy as np
-from orientation_validator import orientation_checker
+from Validators.orientation_validator import orientation_checker
+from keypoint_validator import CubicSplineKeyPointInterpolator
 
 class KeyPointExtractor:
     '''Extracts pose and hand keypoints from videos using MediaPipe
@@ -64,7 +65,7 @@ class KeyPointExtractor:
             return pose_landmarks
 
         for i, lm in enumerate(results.pose_landmarks.landmark):
-            if i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]:
+            if i in range(15):
                 pose_landmarks.append({
                     "cluster_id": 2,
                     "landmark_id": i,
@@ -76,29 +77,34 @@ class KeyPointExtractor:
 
         return pose_landmarks
 
-
-    def extract_hand(self, image_rgb):
+    def extract_hand(self, image_rgb, frame_index):
         ''' 
         takes:
             image_rgb: A single video frame in RGB format
+            frame_index: current 
         returns:
-             extracted hand keypoints as a dictionary with keys "left" and "right", each containing a list of dictionaries with keys:
+            extracted hand keypoints as a dictionary with keys "left" and "right", each containing a list of dictionaries with keys:
                 cluster_id: 0 for left hand, 1 for right hand
                 landmark_id: MediaPipe landmark index
                 x, y, z: Normalized coordinates of the keypoint
+            anomalous_hands: any times where ands had more then 21 points
         '''
         hands_data = {"left": [], "right": []}
+        anomalous_hands = []
 
-        results = self.hands.process(image_rgb, max_num_hands=2)
+        results = self.hands.process(image_rgb)
         if not results.multi_hand_landmarks:
-            return hands_data
+            return hands_data, anomalous_hands
 
         for hand_landmarks, handedness in zip(
             results.multi_hand_landmarks,
-            results.multi_handedness
-        ):
+            results.multi_handedness):
+            
             label = handedness.classification[0].label.lower()
             cluster_id = 0 if label == "left" else 1
+            
+            if len(hand_landmarks.landmark) > 21:
+                anomalous_hands.append((frame_index, label))
 
             for idx, lm in enumerate(hand_landmarks.landmark):
                 hands_data[label].append({
@@ -109,8 +115,7 @@ class KeyPointExtractor:
                     "z": lm.z
                 })
 
-        return hands_data
-
+        return hands_data, anomalous_hands
 
     def extract_metadata(self, cap, video_id=None, sign=None):
         '''
@@ -134,7 +139,6 @@ class KeyPointExtractor:
             "mediapipe_version": mp.__version__
         }
         return metadata
-    
     
     def extract_to_json(self, filename, filepath):
         '''
@@ -160,6 +164,7 @@ class KeyPointExtractor:
         frame_index = 0
         fps = metadata["fps"]
 
+        anomalous_hands = []
         ret, frame = cap.read()
         while ret:
             # Apply rotation BEFORE converting to RGB
@@ -168,8 +173,8 @@ class KeyPointExtractor:
             
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pose_keypoints = self.extract_pose(image_rgb)
-            hand_keypoints = self.extract_hand(image_rgb)
-
+            hand_keypoints, maltiple_hands = self.extract_hand(image_rgb, frame_index)
+            anomalous_hands.append(maltiple_hands)
             frames.append({
                 "frame_index": frame_index,
                 "timestamp": frame_index / fps if fps else None,
@@ -181,6 +186,9 @@ class KeyPointExtractor:
             ret, frame = cap.read()
 
         cap.release()
+        
+        if len(anomalous_hands) > 0:
+            self.handle_anomalous_hands(frames, anomalous_hands, filepath)
 
         output = {
             "metadata": metadata,
@@ -196,7 +204,21 @@ class KeyPointExtractor:
         
         return output
     
-    
+    def handle_simultaneous_hands(self, frames, anomalous_hands, filepath):
+        '''Handles cases where maltiples sets of keypoints in a single instance of a hand
+        takes: 
+            frames: all extracted frames
+            anomalous_hands: all points where this happens
+        '''
+        validator = CubicSplineKeyPointInterpolator()
+        missing_hands = CubicSplineKeyPointInterpolator.checkForMissingHands()
+        for indx, side in anomalous_hands:
+            # split sets of keypoints into seperate sets
+            swapped = (indx, 'right' if side == 'left' else 'left')
+            if swapped in missing_hands:
+                pass
+            # splits  
+            
     def extract_all(self, directory, output_directory):
         '''
         takes:
@@ -235,7 +257,6 @@ class KeyPointExtractor:
                     
                     # reincrypts video
                     video_manager.encrypt_file(decrypted_path, video_manager.get_encryption_key())
-       
        
     def rotate_frame(self, frame, angle):
         """Rotate frame by given angle.

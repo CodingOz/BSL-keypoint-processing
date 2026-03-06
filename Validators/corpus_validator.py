@@ -102,8 +102,6 @@ class CorpusValidator:
         for validator in self.validators:
             self.timings.append(validator.getSignLenths())
         return self.timings
-        
-        
   
     def detect_movement_anomalies(
         self,
@@ -215,7 +213,6 @@ class CorpusValidator:
                     )
 
         return results
-    
     
     def analyse_anomaly_distribution(
         self,
