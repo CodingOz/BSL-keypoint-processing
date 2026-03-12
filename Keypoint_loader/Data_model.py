@@ -5,7 +5,7 @@ import sys
 
 # Add parent directory to path to import KeyPointValidator
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from keypoint_validator import KeyPointValidator, KalmanKeyPointEstimator, CubicSplineKeyPointInterpolator
+from Validators.keypoint_validator import KeyPointValidator, KalmanKeyPointEstimator, CubicSplineKeyPointInterpolator
 
 class DataModel:
     def __init__(self):

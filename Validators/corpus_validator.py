@@ -1,4 +1,4 @@
-from keypoint_validator import CubicSplineKeyPointInterpolator, Sigh_lenths
+from .keypoint_validator import CubicSplineKeyPointInterpolator, Sigh_lenths
 import json
 import os
 from dataclasses import dataclass
@@ -359,5 +359,53 @@ class CorpusValidator:
             aic=aic_scores[best_n],
             is_bimodal=is_bimodal,
         )
-validator = CorpusValidator(r"C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed")
-print(validator.detect_movement_anomalies())
+        
+    def get_all_hand_distances(self, midpoint=0.5) -> dict:
+        """
+        Returns fixed-midpoint distances for every file in the corpus.
+        
+        Returns:
+            {
+                filepath: list[{'left': float|None, 'right': float|None}]  # one dict per frame
+            }
+        """
+        if not hasattr(self, '_all_hand_distances'):
+            self._all_hand_distances = {}
+
+        if len(self._all_hand_distances) > 0:
+            return self._all_hand_distances
+
+        for validator in self.validators:
+            self._all_hand_distances[validator.filepath] = \
+                validator.findAllHandDistancesFromMidpoint(midpoint=midpoint)
+
+        return self._all_hand_distances
+
+
+    def get_all_adaptive_distances(self) -> dict:
+        """
+        Returns adaptive-midpoint distances and the derived midpoint for every file.
+
+        Returns:
+            {
+                filepath: {
+                    'distances':         list[{'left': float|None, 'right': float|None}],
+                    'adaptive_midpoint': float
+                }
+            }
+        """
+        if not hasattr(self, '_all_adaptive_distances'):
+            self._all_adaptive_distances = {}
+
+        if len(self._all_adaptive_distances) > 0:
+            return self._all_adaptive_distances
+
+        for validator in self.validators:
+            distances, midpoint = validator.findAllHandDistancesFromAdaptiveMidpoint()
+            self._all_adaptive_distances[validator.filepath] = {
+                'distances':         distances,
+                'adaptive_midpoint': midpoint
+            }
+
+        return self._all_adaptive_distances
+

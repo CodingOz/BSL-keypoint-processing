@@ -4,8 +4,19 @@ import traceback
 import os
 import numpy as np
 
+import sys
+from pathlib import Path
+# Add the parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from helpers.validation_helpers import *
-from Kalman_filter import HandPositionKalmanFilter 
+try:
+    from Kalman_filter import HandPositionKalmanFilter
+except ImportError:
+    # Handle import when run as a module from parent directory
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from Kalman_filter import HandPositionKalmanFilter 
 from scipy.interpolate import CubicSpline, interp1d
 from dataclasses import dataclass
 
@@ -403,30 +414,155 @@ class KeyPointValidator:
         )
             
     
-    def findMissingValueClusters(self):
-        '''Using the missing frames to find the boundrys of empty space
+    def findNonMissingValueClusters(self):
+        '''Using the missing frames to find the clussers with no empty space
         return:
-            left_boundrys: list of boundry points
-            right_boundrys: list of boundry points
+            left_clusters: list of clusters as array of tuples
+            right_clusters: list of clusters as array of tuples
+            formats - [(startinds, end),(start, end)]
             (a point i means that the boundry is between i and i + 1)
         '''
-        left_boundrys = []
-        right_boundrys = []
+        left_clusters = []
+        right_clusters = []
         
         missing = self.checkForMissingHands()
-        left_currently = True if (0, 'left') in missing else False
-        right_currently = True if (0, 'right') in missing else False
+        left_in_cluster = None if (0, 'left') in missing else 0
+        right_in_cluster = None if (0, 'right') in missing else 0
         for i in range(len(self.frames)):
             left_missing = (i, 'left') in missing
             right_missing = (i, 'right') in missing
             
-            if left_missing ^ left_currently:
-                left_boundrys.append(i-1)
-            if right_missing ^ right_currently:
-                right_boundrys.append(i-1)
-        return left_boundrys, right_boundrys
+            if left_missing:
+                if left_in_cluster != None:
+                    left_clusters.append((left_in_cluster, i-1))
+                    left_in_cluster = None
+            else:
+                if left_in_cluster == None:
+                    left_in_cluster = i
+                
+            if right_missing:
+                if right_in_cluster != None:
+                    right_clusters.append((right_in_cluster, i-1))
+                    right_in_cluster = None
+            else: 
+                if right_in_cluster == None:
+                    right_in_cluster = i
+        
+        return left_clusters, right_clusters
 
 
+    def findHandDistancesFromMidpoint(self, frameIdx, midpoint=0.5, showLogs=False) -> dict:
+        """
+        Returns how far each hand sits from the screen midpoint, signed by side.
+        Left hand: positive = left of midpoint (expected), negative = crossed over right
+        Right hand: positive = right of midpoint (expected), negative = crossed over left
+        Takes:
+            frameIdx:  frame to compute distances for
+            midpoint:  x-coordinate treated as centre (default 0.5 for MediaPipe normalised)
+        Returns:
+            {
+                'left':  float | None,   # midpoint - left_x
+                'right': float | None,   # right_x  - midpoint
+            }
+        """
+        palms = self.findPalmCenters(frameIdx, showLogs=showLogs)
+
+        result = {'left': None, 'right': None}
+
+        left = palms.get('left')
+        if left and left != [None, None] and None not in left:
+            result['left'] = round(midpoint - left[0], 6)
+
+        right = palms.get('right')
+        if right and right != [None, None] and None not in right:
+            result['right'] = round(right[0] - midpoint, 6)
+
+        if showLogs:
+            print(f"Frame {frameIdx} | midpoint={midpoint} | "
+                f"left dist={result['left']}  right dist={result['right']}")
+
+        return result
+
+
+    def findAllHandDistancesFromMidpoint(self, midpoint=0.5, showLogs=False) -> list[dict]:
+        """
+        Runs findHandDistancesFromMidpoint across every frame.
+
+        Returns:
+            list of dicts, one per frame, each {'left': float|None, 'right': float|None}
+        """
+        if self.__palms is None:
+            self.findAllPalmCenters()
+
+        frames = self.data.get('frames', [])
+        return [
+            self.findHandDistancesFromMidpoint(i, midpoint=midpoint, showLogs=showLogs)
+            for i in range(len(frames))
+        ]
+
+
+    def findAdaptiveMidpoint(self, showLogs=False) -> float:
+        """
+        Computes the empirical horizontal centre of the signer by averaging
+        the x-coordinates of ALL visible palm centers across ALL frames.
+
+        This accounts for signers who are not perfectly centred in frame,
+        or for cameras with a compositional offset.
+
+        Returns:
+            float: the mean palm x-coordinate across all frames and both hands
+        """
+        if self.__palms is None:
+            self.findAllPalmCenters()
+
+        all_x = []
+        for palm in self.__palms:
+            for side in ('left', 'right'):
+                pos = palm.get(side)
+                if pos and pos != [None, None] and None not in pos:
+                    all_x.append(pos[0])
+
+        if not all_x:
+            if showLogs:
+                print("No visible palms found — falling back to midpoint=0.5")
+            return 0.5
+
+        adaptive = float(np.mean(all_x))
+
+        if showLogs:
+            print(f"Adaptive midpoint: {adaptive:.4f}  (computed from {len(all_x)} palm observations)")
+
+        return adaptive
+
+
+    def findAllHandDistancesFromAdaptiveMidpoint(self, showLogs=False) -> tuple[list[dict], float]:
+        """
+        Computes the adaptive midpoint from palm data, then returns distances
+        for every frame using that midpoint.
+
+        Returns:
+            (distances, adaptive_midpoint)
+            distances: list of {'left': float|None, 'right': float|None}, one per frame
+            adaptive_midpoint: the empirically derived centre used
+        """
+        midpoint = self.findAdaptiveMidpoint(showLogs=showLogs)
+        distances = self.findAllHandDistancesFromMidpoint(midpoint=midpoint, showLogs=showLogs)
+        return distances, midpoint
+
+    def flagAbnormalDistances(self, outlier_boundry=-0.1):
+        '''Uses relitive to'''
+        distances, midpoint = self.findAllHandDistancesFromAdaptiveMidpoint()
+        left_flags = []
+        right_flags = []
+        for indx, distance in enumerate(distances):
+            if distance.get("left"):
+                if distance.get("left") < outlier_boundry:
+                    left_flags.append(indx)
+            if distance.get("right"):
+                if distance.get("right") < outlier_boundry:
+                    right_flags.append(indx)
+        return left_flags, right_flags
+    
 class KalmanKeyPointEstimator(KeyPointValidator):
     def __init__(self, filepath):
         super().__init__(filepath)
@@ -599,7 +735,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         if method in self.methods:
             self.method = method
 
-    def interpolate_sequence(self, positions):
+    def interpolateSequence(self, positions):
         # Separate into known and unknown
         frames = np.arange(len(positions))
         known_frames = []
@@ -672,7 +808,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         for side in ['left', 'right']:
             # Extract sequence for this hand
             positions = [p[side] for p in self._KeyPointValidator__palms]
-            filled_positions, was_interpolated = self.interpolate_sequence(positions)
+            filled_positions, was_interpolated = self.interpolateSequence(positions)
             
             # Store results
             for i in range(len(filled_positions)):
@@ -726,7 +862,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
             self.__accelerationsEstimated = self.estimateMissingAccelerations()
         return self.__accelerationsEstimated
     
-    def findMovmentClusters(self, max_momentum=0):
+    def findMovmentClusters(self, max_momentum=0.15):
         '''Uses momentum spikes to find the boundrys between clusters
            of hand frames with resmables movement 
            This is a marker for poptencaly problimatice frames
@@ -745,19 +881,18 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         for i in range(len(momentums) - 1):
             # Check left hand momentum
             left_mag_curr = momentums[i]['left']['magnitude']
-            left_mag_next = momentums[i + 1]['left']['magnitude']
             
-            if left_mag_curr > max_momentum and left_mag_next > max_momentum:
+            if left_mag_curr > max_momentum:
                 left_boundrys.append(i + 1)
             
             # Check right hand momentum
             right_mag_curr = momentums[i]['right']['magnitude']
-            right_mag_next = momentums[i + 1]['right']['magnitude']
             
-            if right_mag_curr > max_momentum and right_mag_next > max_momentum:
+            if right_mag_curr > max_momentum:
                 right_boundrys.append(i + 1)
         
         return left_boundrys, right_boundrys
+    
         
 if __name__ == "__main__":
     
@@ -768,10 +903,12 @@ if __name__ == "__main__":
     
     print()
     
-    left_missing, right_missing = validator.findMissingValueClusters()
+    left_missing, right_missing = validator.findNonMissingValueClusters()
     left_fast, right_fast = validator.findMovmentClusters()
     
-    print('missing values\n',left_missing, '\n\n', 'movment\n', len(left_fast))
+    #print('visible values\n', left_missing, '\n\n', 'movment\n', left_fast)
+    
+    print(validator.flagAbnormalDistances())
     
     '''
     frame = 66
