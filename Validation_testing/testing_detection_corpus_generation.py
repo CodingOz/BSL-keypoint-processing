@@ -65,43 +65,52 @@ class LayeredGaussianDistribution:
                 raise ValueError(f"weights must have {components} values")
             self.weights = self.weights / self.weights.sum()  # normalize
     
-    def sample_region(self, total_frames: int, hole_size: int) -> Tuple[int, int]:
+    def sample_region(self, total_frames: int, hole_size: int,
+                  sign_data: dict = None) -> Tuple[int, int]:
         """
         Sample an available_area from the layered Gaussian distribution.
-        
-        takes:
-            total_frames: Total number of frames in the sign
-            hole_size: Size of the swap to be performed
-            
-        Returns:
-            Tuple of (start_frame, end_frame) representing available_area
+        If sign_data is provided, resamples until the centre lands in a 
+        region with hand data, preserving the distributional shape while
+        avoiding empty frame regions.
         """
-        # Select a component based on weights
-        component_idx = np.random.choice(self.components, p=self.weights)
-        
-        # Sample from the selected Gaussian component
-        mean_pos = self.means[component_idx]
-        std_pos = self.stds[component_idx]
-        
-        # Sample a position (as percentage through frames)
-        center_percent = np.random.normal(mean_pos, std_pos)
-        center_percent = np.clip(center_percent, 0, 1)  # Clamp to [0, 1]
-        
-        # Convert to frame indices
-        center_frame = int(center_percent * (total_frames - 1))
-        
-        # Define available area around this center with margin for hole_size
-        margin = max(hole_size, int(0.1 * total_frames))  # At least hole_size or 10% buffer
-        start = max(0, center_frame - margin)
-        end = min(total_frames, center_frame + margin)
-        
-        # Ensure valid range
-        if end <= start:
-            end = min(total_frames, start + 2 * margin)
-        
-        return (start, end)
+        # pre-compute hand-present frame indices once
+        if sign_data is not None:
+            frames_list = sign_data.get('frames', [])
+            frames_with_hands = {
+                i for i, f in enumerate(frames_list)
+                if f.get('hands', {}).get('left') or f.get('hands', {}).get('right')
+            }
+        else:
+            frames_with_hands = None
 
+        for attempt in range(200):
+            component_idx  = np.random.choice(self.components, p=self.weights)
+            mean_pos       = self.means[component_idx]
+            std_pos        = self.stds[component_idx]
 
+            center_percent = np.clip(np.random.normal(mean_pos, std_pos), 0, 1)
+            center_frame   = int(center_percent * (total_frames - 1))
+
+            # if we have hand data, only accept centres near visible hands
+            if frames_with_hands is not None:
+                margin = max(hole_size, int(0.1 * total_frames))
+                window = set(range(max(0, center_frame - margin),
+                                min(total_frames, center_frame + margin)))
+                if not window & frames_with_hands:
+                    continue   # resample — this centre is in an empty region
+
+            margin = max(hole_size, int(0.1 * total_frames))
+            start  = max(0, center_frame - margin)
+            end    = min(total_frames, center_frame + margin)
+            if end <= start:
+                end = min(total_frames, start + 2 * margin)
+
+            return (start, end)
+
+        # fallback: return the full range and let the outer loop find the best spot
+        return (0, total_frames)
+    
+    
 class CorpusDegradator:
     """
     Applies systematic degradation to a sign corpus according to a distribution pattern.
@@ -148,96 +157,23 @@ class CorpusDegradator:
                     files.append(os.path.join(root, fname))
         return sorted(files)
     
+    
     def apply_pattern(self, patterns: List[DegradationPattern]) -> Dict:
-        """
-        apply degradation patterns to corpus files.
-        
+        '''Apply Gaussian-distributed degradation patterns to corpus files.
+
         takes:
             patterns: List of DegradationPattern objects, one per file in corpus
-            
-        Returns:
+        returns:
             Dictionary with degradation statistics and metadata
-        """
-        if len(patterns) != len(self.corpus_files):
-            raise ValueError(
-                f"Number of patterns ({len(patterns)}) must match corpus size ({len(self.corpus_files)})"
-            )
+        '''
         
-        results = {
-            'total_files': len(self.corpus_files),
-            'degraded_files': [],
-            'statistics': {}
-        }
-        
-        for idx, (filepath, pattern) in enumerate(zip(self.corpus_files, patterns)):
-            print(f"\n[{idx+1}/{len(self.corpus_files)}] Processing: {os.path.basename(filepath)}")
-            print(f"  Pattern: {pattern.num_swaps} swaps, sizes: {pattern.swap_sizes}")
-            
-            try:
-                # Load the original sign data
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    sign_data = json.load(f)
-                
-                total_frames = len(sign_data.get('frames', []))
-                degraded_data = sign_data
-                swap_info = []
-                
-                # Apply each swap
-                used_frames = set()
-                for swap_idx, swap_size in enumerate(pattern.swap_sizes):
-                    attempts = 0
-                    while attempts < 50:
-                        available_area = self.gaussian_dist.sample_region(total_frames, swap_size)
-                        # peek at what frameSwap would pick — or just check area overlap
-                        area_frames = set(range(available_area[0], available_area[1]))
-                        if not area_frames & used_frames:
-                            break
-                        attempts += 1
-                    used_frames |= area_frames
-                    # Apply the swap
-                    degraded_data = self.degradator.frameSwap(
-                        degraded_data, 
-                        hole_size=swap_size, 
-                        available_area=available_area
-                    )
-                    
-                    # Track the swap
-                    swap_info.append({
-                        'swap_index': swap_idx,
-                        'size': swap_size,
-                        'available_area': available_area
-                    })
-                
-                # Save the degraded file
-                output_path = os.path.join(
-                    self.output_corpus_path, 
-                    os.path.basename(filepath)
-                )
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    json.dump(degraded_data, f, indent=2)
-                
-                results['degraded_files'].append({
-                    'filename': os.path.basename(filepath),
-                    'output_path': output_path,
-                    'pattern': {
-                        'num_swaps': pattern.num_swaps,
-                        'swap_sizes': pattern.swap_sizes
-                    },
-                    'total_frames': total_frames,
-                    'swap_details': swap_info
-                })
-                
-            except Exception as e:
-                print(f"  ERROR processing {filepath}: {e}")
-                results['degraded_files'].append({
-                    'filename': os.path.basename(filepath),
-                    'error': str(e)
-                })
-        
-        # Summary statistics
-        results['statistics'] = self._compute_statistics(results['degraded_files'])
-        
-        return results
+        return self._apply_with_sampler(
+            patterns,
+            output_path   = self.output_corpus_path,
+            sampler       = self._sample_region_gaussian,
+            sampler_label = 'gaussian',
+        )
+    
     
     def _compute_statistics(self, degraded_files: List[Dict]) -> Dict:
         """Compute summary statistics of degradation."""
@@ -257,13 +193,219 @@ class CorpusDegradator:
             'total_swaps': total_swaps,
             'swap_size_distribution': swap_size_distribution
         }
+    
+    
+    def _sample_region_gaussian(self, total_frames: int, swap_size: int, sign_data: dict = None) -> tuple[int, int]:
+        """Existing Gaussian-based placement — delegates to LayeredGaussianDistribution."""
+        return self.gaussian_dist.sample_region(total_frames, swap_size, sign_data=sign_data)
+
+
+    def _sample_region_uniform(self, total_frames: int, swap_size: int, sign_data: dict = None) -> tuple[int, int]:
+        """
+        Places swaps with equal probability at any valid position in the sign.
+        Returns the full frame range as available_area so frameSwap samples freely.
+        """
+        return (0, total_frames)
+
+    def _sample_region_stratified(self, total_frames: int, swap_size: int,
+                                n_strata: int = 5,
+                                sign_data: dict = None) -> tuple[int, int]:
+        """
+        Picks a stratum weighted by hand coverage within each band.
+        If sign_data is provided, strata with more visible hand frames
+        are proportionally more likely to be selected.
+        """
+        stratum_width = total_frames // n_strata
+        strata = [
+            (i * stratum_width, min((i + 1) * stratum_width, total_frames))
+            for i in range(n_strata)
+        ]
+
+        if sign_data is not None:
+            frames = sign_data.get('frames', [])
+            weights = []
+            for start, end in strata:
+                hand_frames = sum(
+                    1 for f in frames[start:end]
+                    if (f.get('hands', {}).get('left') or 
+                        f.get('hands', {}).get('right'))
+                )
+                weights.append(max(hand_frames, 1))  # avoid zero weights
+            weights = np.array(weights, dtype=float)
+            weights /= weights.sum()
+        else:
+            weights = None  # uniform across strata
+
+        chosen = np.random.choice(n_strata, p=weights)
+        return strata[chosen]
+    
+    
+    def _apply_with_sampler(
+        self,
+        patterns:      list,
+        output_path:   str,
+        sampler:       callable,
+        sampler_label: str,
+    ) -> dict:
+        """
+        Core degradation loop — shared by all apply_* methods.
+        Placement is fully determined by the sampler callable:
+            sampler(total_frames, swap_size) -> (start, end)
+        """
+        if len(patterns) != len(self.corpus_files):
+            raise ValueError(
+                f"Number of patterns ({len(patterns)}) must match "
+                f"corpus size ({len(self.corpus_files)})"
+            )
+
+        os.makedirs(output_path, exist_ok=True)
+        
+        file_pattern_pairs = list(zip(self.corpus_files, patterns))
+        np.random.shuffle(file_pattern_pairs)
+        
+        results = {
+            'total_files':    len(self.corpus_files),
+            'sampler':        sampler_label,
+            'degraded_files': [],
+            'statistics':     {}
+        }
+
+        for idx, (filepath, pattern) in enumerate(zip(self.corpus_files, patterns)):
+            print(f"\n[{idx+1}/{len(self.corpus_files)}] {os.path.basename(filepath)}"
+                f"  ({sampler_label})")
+
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    sign_data = json.load(f)
+
+                total_frames  = len(sign_data.get('frames', []))
+                degraded_data = sign_data
+                swap_info     = []
+                used_frames   = set()
+
+                for swap_idx, swap_size in enumerate(pattern.swap_sizes):
+                    frames_list = sign_data.get('frames', [])
+                    
+                    # pre-compute which frames have hand data — do this once per file outside the loop
+                    frames_with_hands = {
+                        i for i, f in enumerate(frames_list)
+                        if f.get('hands', {}).get('left') or f.get('hands', {}).get('right')
+                    }
+
+                    best_start    = None
+                    best_coverage = -1
+
+                    for attempt in range(200):
+                        candidate_area = sampler(total_frames, swap_size, sign_data=sign_data)
+                        area_frames    = set(range(candidate_area[0], candidate_area[1]))
+
+                        if area_frames & used_frames:
+                            continue
+
+                        # find the best contiguous start within this area
+                        for start in range(candidate_area[0], 
+                                        min(candidate_area[1], total_frames - swap_size + 1)):
+                            window    = set(range(start, start + swap_size))
+                            coverage  = len(window & frames_with_hands)
+                            if coverage > best_coverage:
+                                best_coverage = coverage
+                                best_start    = start
+                            if coverage >= swap_size:   # perfect — stop immediately
+                                break
+
+                        if best_coverage >= swap_size * 0.5:
+                            break
+
+                    if best_start is None or best_coverage == 0:
+                        print(f"    Skipping swap {swap_idx+1} — no frames with hand data available")
+                        continue
+
+                    if best_coverage < swap_size * 0.5:
+                        print(f"    Warning: swap {swap_idx+1} has only {best_coverage}/{swap_size} "
+                            f"frames with hand data")
+
+                    # pass a tight window so frameSwap is forced to use best_start
+                    tight_area = (best_start, best_start + swap_size + 1)
+                    used_frames |= set(range(best_start, best_start + swap_size))
+
+                    degraded_data = self.degradator.frameSwap(
+                        degraded_data,
+                        hole_size=swap_size,
+                        available_area=tight_area,
+                    )
+                    swap_info.append({
+                        'swap_index':    swap_idx,
+                        'size':          swap_size,
+                        'available_area': tight_area,
+                        'hand_coverage': best_coverage,
+                    })
+                
+                out = os.path.join(output_path, os.path.basename(filepath))
+                with open(out, 'w', encoding='utf-8') as f:
+                    json.dump(degraded_data, f, indent=2)
+
+                results['degraded_files'].append({
+                    'filename':    os.path.basename(filepath),
+                    'output_path': out,
+                    'pattern':     {'num_swaps': pattern.num_swaps,
+                                    'swap_sizes': pattern.swap_sizes},
+                    'total_frames': total_frames,
+                    'swap_details': swap_info,
+                })
+
+            except Exception as e:
+                print(f"  ERROR: {e}")
+                results['degraded_files'].append({
+                    'filename': os.path.basename(filepath),
+                    'error':    str(e),
+                })
+
+        results['statistics'] = self._compute_statistics(results['degraded_files'])
+        return results
+
+    #  public apply methods
+    
+    def apply_pattern_uniform(self, patterns: list, output_path: str = None) -> dict:
+        """
+        Uniform random placement — no distributional assumption.
+        Swaps can land anywhere in the sign with equal probability.
+        Use this as a distribution-free baseline to isolate whether
+        Gaussian placement artificially inflates or deflates detector scores.
+        """
+        out = output_path or self.output_corpus_path.rstrip('/\\') + '_uniform'
+        return self._apply_with_sampler(
+            patterns,
+            output_path   = out,
+            sampler       = self._sample_region_uniform,
+            sampler_label = 'uniform',
+        )
+
+    def apply_pattern_stratified(self, patterns: List[DegradationPattern], 
+                                n_strata: int = 5,
+                                output_path: str = None) -> Dict:
+        """
+        Stratified placement — sign divided into equal bands, one picked per swap.
+        Guarantees swaps are spread across the sign rather than clustering,
+        which tests detector performance independently of positional bias.
+        Sign data is passed per-file automatically so strata are weighted
+        by hand coverage for each individual file.
+        """
+        out = output_path or self.output_corpus_path.rstrip('/\\') + '_stratified'
+        sampler = lambda total, size, sign_data=None: self._sample_region_stratified(
+            total, size, n_strata=n_strata, sign_data=sign_data
+        )
+        return self._apply_with_sampler(
+            patterns,
+            output_path   = out,
+            sampler       = sampler,
+            sampler_label = f'stratified(k={n_strata})',
+        )
 
 
 def create_default_degradation_patterns() -> List[DegradationPattern]:
     """
     degradation pattern for 22 files:
-    - 5 files with 4 swaps of size 1
-    - 2 files with 2 swaps of size 2
+    - 7 files with 4 swaps of size 1
     - 5 files with 2 swaps of size 2
     - 2 files with 4 swaps of size 2
     - 4 files with 2 swaps of size 3
@@ -275,12 +417,12 @@ def create_default_degradation_patterns() -> List[DegradationPattern]:
     """
     patterns = []
     
-    # 5 files with 4 swaps of size 1
-    for _ in range(5):
+    # 7 files with 4 swaps of size 1
+    for _ in range(7):
         patterns.append(DegradationPattern(num_swaps=4, swap_sizes=[1, 1, 1, 1]))
 
-    # 7 files with 2 swaps of size 2
-    for _ in range(7):
+    # 5 files with 2 swaps of size 2
+    for _ in range(5):
         patterns.append(DegradationPattern(num_swaps=2, swap_sizes=[2, 2]))
     
     # 2 files with 4 swaps of size 2
@@ -312,7 +454,7 @@ if __name__ == "__main__":
     }
     
     base_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_SubCorpus"
-    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\swapped_hands_corpus"
+    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Uniform"
     
     
     patterns = create_default_degradation_patterns()
@@ -321,4 +463,26 @@ if __name__ == "__main__":
                                   output_corpus_path, 
                                   gaussian_config=gaussian_config)
     
+    #results = degradator.apply_pattern_uniform(patterns)
+    
+    
+    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified"
+    
+    
+    patterns = create_default_degradation_patterns()
+    
+    degradator = CorpusDegradator(base_corpus_path, 
+                                  output_corpus_path, 
+                                  gaussian_config=gaussian_config)
+    
+    #results = degradator.apply_pattern_stratified(patterns, n_strata=5)
+    
+    
+    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Test_corpus_with_gaussian_using_momentum_heuristics"
+    
+    degradator = CorpusDegradator(base_corpus_path, 
+                                  output_corpus_path, 
+                                  gaussian_config=gaussian_config)
+    
     results = degradator.apply_pattern(patterns)
+    

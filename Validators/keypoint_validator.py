@@ -797,7 +797,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
 
     def getFilledPalmCenters(self):
         if self.__filled_palms is not None:
-            return self.__filled_palms
+            return self.__filled_palms, self.__estimation_flags
         
         if self._KeyPointValidator__palms is None:
             self.findAllPalmCenters()
@@ -870,9 +870,8 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         returns:
             left_boundrys: list of boundry points
             right_boundrys: list of boundry points
-            (a point i means that the boundry is between i and i + 1)
-            ^^^^^^^^
-            DONT FORGET THIS YOU DUMBASS
+            (points  i and i + 1 are the boundry between clusters
+            and are both recorded)
         '''
         momentums = self.getEstimatedMomentums()
         left_boundrys = []
@@ -883,13 +882,16 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
             left_mag_curr = momentums[i]['left']['magnitude']
             
             if left_mag_curr > max_momentum:
-                left_boundrys.append(i + 1)
+                left_boundrys.append(i)
+                left_boundrys.append(i+1)
             
             # Check right hand momentum
             right_mag_curr = momentums[i]['right']['magnitude']
             
             if right_mag_curr > max_momentum:
-                right_boundrys.append(i + 1)
+                right_boundrys.append(i)
+                right_boundrys.append(i+1)
+
         
         return left_boundrys, right_boundrys
     

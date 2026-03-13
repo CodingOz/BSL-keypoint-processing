@@ -345,10 +345,130 @@ class RunDetectionTests:
 
         return best
     
+    @staticmethod
+    def performance_by_swap_size(
+        summaries: dict[str, 'MethodSummary'],
+        methods:   list[str] = ('position_only', 'filled_movement', 'position_and_filled_movement'),
+        metric:    str = 'f1',
+        side:      str = 'combined',
+    ):
+        """
+        For each specified method, finds the best param config (by aggregate metric),
+        then breaks down TP/FP/TN/FN and derived metrics per swap size.
+
+        Swap size is read from metadata["testing_changes"] in each file's ground truth —
+        a frame is attributed to a swap size based on which change entry it came from.
+
+        takes:
+            summaries: output of run()
+            methods:   method names to include
+            metric:    metric used to select best params per method
+            side:      'left' | 'right' | 'combined'
+        """
+
+        # ── find best param config per method ─────────────────────────────────────
+        best_keys: dict[str, str] = {}   # method_name -> summary key
+        for key, summary in summaries.items():
+            if summary.method_name not in methods:
+                continue
+            agg   = summary.aggregate()
+            score = getattr(agg[side], metric)
+            prev  = best_keys.get(summary.method_name)
+            if prev is None or score > getattr(summaries[prev].aggregate()[side], metric):
+                best_keys[summary.method_name] = key
+
+        # ── helper: attribute each ground-truth frame to its swap size ─────────────
+        @staticmethod
+        def _frames_by_swap_size(filepath: str) -> dict[int, dict[str, set[int]]]:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            changes = data.get('metadata', {}).get('testing_changes', [])
+            by_size: dict[int, dict[str, set[int]]] = {}
+            for change in changes:
+                size       = change['size']
+                start      = change['start_frame']
+                swap_range = set(range(start, start + size))
+                if size not in by_size:
+                    by_size[size] = {'left': set(), 'right': set()}
+                for fi in change.get('left_hand_frames', []):
+                    if fi in swap_range:
+                        by_size[size]['left'].add(fi)
+                for fi in change.get('right_hand_frames', []):
+                    if fi in swap_range:
+                        by_size[size]['right'].add(fi)
+            return by_size
+
+        # ── accumulate confusion matrices per method per swap size ─────────────────
+        all_swap_sizes = sorted({1, 2, 3, 4, 5})  # known from degradation patterns
+
+        # structure: {method_name: {swap_size: FrameLevelMetrics}}
+        breakdown: dict[str, dict[int, FrameLevelMetrics]] = {
+            m: {s: FrameLevelMetrics() for s in all_swap_sizes}
+            for m in best_keys
+        }
+
+        for method_name, key in best_keys.items():
+            summary = summaries[key]
+
+            for file_result in summary.per_file:
+                by_size = _frames_by_swap_size(file_result.filepath)
+
+                detected_left  = set(file_result.detected_left)
+                detected_right = set(file_result.detected_right)
+
+                for swap_size, sides in by_size.items():
+                    if swap_size not in breakdown[method_name]:
+                        continue
+
+                    m = breakdown[method_name][swap_size]
+
+                    for side_key, truth_set in sides.items():
+                        detected = detected_left if side_key == 'left' else detected_right
+
+                        if side == 'combined' or side == side_key:
+                            m.true_positives  += len(detected & truth_set)
+                            m.false_negatives += len(truth_set - detected)
+                            # FP/TN per swap size isn't meaningful at frame level
+                            # (FPs come from clean frames unrelated to this swap)
+                            # so we track them globally and note it in output
+
+        # ── print table ───────────────────────────────────────────────────────────
+        col_w = 12
+        print(f"\n{'═' * 80}")
+        print(f"Performance by Swap Size  (metric={metric}, side={side})")
+        print(f"Best configs selected by aggregate {metric}")
+        print(f"{'═' * 80}")
+
+        for method_name, key in best_keys.items():
+            summary = summaries[key]
+            print(f"\n  {method_name}  {summary.params}")
+            print(f"  {'Size':<8} {'TP':>6} {'FN':>6} {'Recall':>8}  {'Files':>6}")
+            print(f"  {'-' * 40}")
+
+            for swap_size in all_swap_sizes:
+                m         = breakdown[method_name][swap_size]
+                recall    = m.recall  # TP / (TP + FN) — meaningful per swap size
+                total_pos = m.true_positives + m.false_negatives
+                # count how many files had swaps of this size
+                n_files = sum(
+                    1 for fr in summary.per_file
+                    if swap_size in _frames_by_swap_size(fr.filepath)
+                )
+                print(f"  {swap_size:<8} {m.true_positives:>6} {m.false_negatives:>6} "
+                    f"{recall:>8.3f}  {n_files:>6}")
+
+            print(f"\n  Note: precision/F1 per swap size omitted — FPs arise from clean frames")
+            print(f"        unattributable to any single swap. Use aggregate table for F1.")
+
+        print(f"\n{'═' * 80}")
     
 if __name__ == "__main__":
+    uniform_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Uniform_uniform"
+    simple_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified"
+    gaussian_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Test_corpus_with_gaussian_using_momentum_heuristics"
+
     runner = RunDetectionTests(
-        corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\swapped_hands_corpus"
+        corpus_path=simple_corpus_path
     )
 
     # run all methods with default param grids
@@ -358,4 +478,19 @@ if __name__ == "__main__":
     RunDetectionTests.print_summary(summaries)
 
     # find best threshold per method by F1
-    RunDetectionTests.best_params(summaries, metric='f1', side='combined')
+    #runner.best_params(summaries, metric='f1', side='combined')
+    
+    '''
+    print("Gaussian placement corpus:")
+    RunDetectionTests.performance_by_swap_size(summaries, metric='f1', side='combined')
+
+    print("\n\nUniform placement corpus:")
+    runner_uniform = RunDetectionTests(corpus_path=uniform_corpus_path)
+    summaries_uniform = runner_uniform.run(verbose=False)
+    RunDetectionTests.performance_by_swap_size(summaries_uniform, metric='f1', side='combined')
+
+    print("\n\nStratified placement corpus:")
+    runner_stratified = RunDetectionTests(corpus_path=simple_corpus_path)
+    summaries_stratified = runner_stratified.run(verbose=False)
+    RunDetectionTests.performance_by_swap_size(summaries_stratified, metric='f1', side='combined')
+    '''
