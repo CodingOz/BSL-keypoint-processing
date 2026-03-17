@@ -47,7 +47,6 @@ class Sigh_lenths:
     lenth_with_hands: int
     
     
-
 class KeyPointValidator:
     def __init__(self, filepath):
         # loads json file
@@ -413,7 +412,6 @@ class KeyPointValidator:
             lenth_with_hands=length_with_hands
         )
             
-    
     def findNonMissingValueClusters(self):
         '''Using the missing frames to find the clussers with no empty space
         return:
@@ -562,6 +560,31 @@ class KeyPointValidator:
                 if distance.get("right") < outlier_boundry:
                     right_flags.append(indx)
         return left_flags, right_flags
+    
+    def getKeyPointsAsLists(self):
+        """Returns a 3d list holding the x and y coordinates of all 41 landmarks for
+        each hand in each frame, with None for missing hands or landmarks.
+        """
+        keypoint_data = []
+        for frame in self.frames:
+            frame_keypoints = {'left': None, 'right': None}
+            hands = frame.get('hands', {})
+            for side in ('left', 'right'):
+                landmarks = hands.get(side, []) if isinstance(hands, dict) else []
+                if landmarks:
+                    # Create a list of 41 landmarks initialized to None
+                    side_keypoints = [[None, None] for _ in range(41)]
+                    for lm in landmarks:
+                        if isinstance(lm, dict):
+                            landmark_id = lm.get('landmark_id')
+                            x = lm.get('x')
+                            y = lm.get('y')
+                            if landmark_id is not None and 0 <= landmark_id < 41:
+                                side_keypoints[landmark_id] = [x, y]
+                    frame_keypoints[side] = side_keypoints
+            keypoint_data.append(frame_keypoints)
+        return keypoint_data
+        
     
 class KalmanKeyPointEstimator(KeyPointValidator):
     def __init__(self, filepath):
@@ -724,6 +747,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
             self.__accelerationsEstimated = self.estimateMissingAccelerations()
         return self.__accelerationsEstimated
     
+    
 class CubicSplineKeyPointInterpolator(KeyPointValidator):
     def __init__(self, filepath, method='cubic'):
         super().__init__(filepath)
@@ -736,6 +760,10 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
             self.method = method
 
     def interpolateSequence(self, positions):
+        '''
+        Interpolates a sequence of 2D positions (with None for missing) using the specified method.
+        Returns: A list of interpolated positions and a list of flags indicating which positions were interpolated.
+        '''
         # Separate into known and unknown
         frames = np.arange(len(positions))
         known_frames = []
@@ -895,12 +923,53 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         
         return left_boundrys, right_boundrys
     
+    def interpolateFullHands(self, start_frame=0, end_frame=None, showLogs=False):
+        '''Interpolate all 41 landmarks for each hand across all frames, not just the palm center.
+           This is a more complex interpolation that can fill in missing fingers as well.
+           
+           Returns:
+               filled_keypoints: list of frames, each with 'left' and 'right' keys containing lists of 41 landmarks
+               estimation_flags: list of frames, each with 'left' and 'right' keys containing lists of booleans indicating which landmarks were estimated
+        '''
         
+        keypoint_data = self.getKeyPointsAsLists()
+        
+        filled_keypoints = []
+        estimation_flags = []
+        
+        for side in ['left', 'right']:
+            # Extract sequences for this hand and all landmarks
+            landmark_sequences = [[] for _ in range(41)]
+            for frame in keypoint_data:
+                for lm_id in range(41):
+                    pos = frame[side][lm_id] if frame[side] else [None, None]
+                    landmark_sequences[lm_id].append(pos)
+            
+            # Interpolate each landmark sequence
+            filled_landmarks = []
+            flags_landmarks = []
+            for lm_id in range(41):
+                filled_positions, was_interpolated = self.interpolateSequence(landmark_sequences[lm_id])
+                filled_landmarks.append(filled_positions)
+                flags_landmarks.append(was_interpolated)
+            
+            # Reconstruct filled keypoints per frame
+            for i in range(len(keypoint_data)):
+                if len(filled_keypoints) <= i:
+                    filled_keypoints.append({'left': [[None, None] for _ in range(41)],
+                                            'right': [[None, None] for _ in range(41)]})
+                    estimation_flags.append({'left': [False]*41, 'right': [False]*41})
+                
+                for lm_id in range(41):
+                    filled_keypoints[i][side][lm_id] = filled_landmarks[lm_id][i]
+                    estimation_flags[i][side][lm_id] = flags_landmarks[lm_id][i]
+        
+        return filled_keypoints, estimation_flags
 if __name__ == "__main__":
     
     path = r'C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\3e9dd7e5-f6a3-4b1f-9f29-9fba66f0b73c.json'
     path = r"C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\acf7a090-7ece-488a-a6e8-f4df878629a9.json"
-
+    path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified - recursive level 1\1be98b34-0edc-41ee-871c-e592c0b4198f.json"
     validator = CubicSplineKeyPointInterpolator(path)
     
     print()
@@ -910,7 +979,12 @@ if __name__ == "__main__":
     
     #print('visible values\n', left_missing, '\n\n', 'movment\n', left_fast)
     
-    print(validator.flagAbnormalDistances())
+    
+    print(validator.estimateMissingMomentums(), "\n\n")
+    
+    print(validator.findMovmentClusters(max_momentum=0.1))
+    
+    
     
     '''
     frame = 66

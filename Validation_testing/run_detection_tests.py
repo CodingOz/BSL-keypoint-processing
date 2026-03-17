@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import os
 from dataclasses import dataclass, field
@@ -5,9 +6,13 @@ from typing import Callable
 import numpy as np
 import sys
 from pathlib import Path
+import shutil
+import tempfile
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from anomaly_detection import AnomalyDetection
+from data_cleaner import DataCleaner
+from copy import deepcopy
 
 
 # Result types
@@ -159,7 +164,6 @@ class RunDetectionTests:
             print(f"Loaded {len(self.files)} degraded files from {corpus_path}")
 
     # file loading
-
     def _load_files(self) -> list[str]:
         paths = []
         for root, _, filenames in os.walk(self.corpus_path):
@@ -461,25 +465,112 @@ class RunDetectionTests:
             print(f"        unattributable to any single swap. Use aggregate table for F1.")
 
         print(f"\n{'═' * 80}")
+
+def run_recursive_data_cleaning(
+    recursive_range: tuple = (0, 1, 2, 3, 4, 5),
+    show_logs:       bool  = False
+):
+    '''goes through each file in the "path/to/Testing_Corpus_Stratified_stratified - recursive level i" 
+    for recursive_range (i, i+1, etc) and runs the data cleaner's detectAnomalousFrames with recursive_level=i
+    note that this does not test methods/paramiters of detectAnomalousFrames, 
+    it just uses the default position_threshold=-0.1, movement_threshole=0.1, gap_size=5
     
+    takes:
+        recursive_range: tuple of ints, the recursive levels to run e.g. (0, 1, 2)
+        show_logs: whether to print logs of the cleaning process
+        
+    returns: 
+        summaries: tuple of (recursive_level, method_summary_dict) based on analysis of 
+        "path/to/Testing_Corpus_Stratified_stratified - recursive level i" for each recursive level in recursive_range
+        found: list of the detected anomalous frames for each file in each recursive level, as returned by detectAnomalousFrames
+    '''
+    
+    directories = [r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified - recursive level " + str(i) for i in recursive_range]
+    
+    level_summaries = {
+        level: MethodSummary(
+            method_name='recursive_cleaning',
+            params={'recursive_level': level}
+        )
+        for level in recursive_range
+    }    
+    found = []
+    
+    for level, directory in zip(recursive_range, directories):
+        print(f"\nRunning recursive data cleaning on directory: {directory}")
+        
+        
+        # loops through each file in the Testing_Corpus_Stratified_stratified - recursive level i
+        
+        root_path = Path(directory)
+        for path in root_path.rglob('*.json'): 
+            cleaner = DataCleaner(path=str(path))
+            found.append(cleaner.detectAnomalousFrames(
+                recursive_level=level))
+    
+            # compears the metadata of 'left_anomalous_frames' and 'right_anomalous_frames' with the 'testing_changes' metadata to calculate the true positives, false positives, true negatives and false negatives for each recursive level
+            # and appends the results to summaries as a tuple of (recursive_level, method_summary_dict)
+            
+            # get the ground truth swapped frames from testing_changes
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            changes = data.get('metadata', {}).get('testing_changes', [])
+            gt_left = set()
+            gt_right = set()
+            
+            for change in changes:
+                start = change['start_frame']
+                size  = change['size']
+                swap_range = set(range(start, start + size))
+                gt_left.update(fi for fi in change.get('left_hand_frames', []) if fi in swap_range)
+                gt_right.update(fi for fi in change.get('right_hand_frames', []) if fi in swap_range)
+            
+            # get the detected anomalous frames from metadata
+            meta = cleaner.getAllMetadata()
+            detected_left  = set(f['frame_index'] for f in meta.get('left_anomalous_frames', []))
+            detected_right = set(f['frame_index'] for f in meta.get('right_anomalous_frames', []))
+            total_frames   = len(data.get('frames', []))
+
+            # calculate metrics
+            metrics_left  = RunDetectionTests._compute_metrics(detected_left,  gt_left,  total_frames)
+            metrics_right = RunDetectionTests._compute_metrics(detected_right, gt_right, total_frames)
+
+            level_summaries[level].per_file.append(FileResult(
+                filepath=str(path),
+                method_name='recursive_cleaning_level_' + str(level),
+                params={'recursive_level': level},
+                metrics_left=metrics_left,
+                metrics_right=metrics_right,
+                ground_truth_left=list(gt_left),
+                ground_truth_right=list(gt_right),
+                detected_left=list(detected_left),
+                detected_right=list(detected_right),
+                total_frames=total_frames
+            ))
+
+    return [s for s in level_summaries.values()], found
+                    
+            
+        
 if __name__ == "__main__":
     uniform_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Uniform_uniform"
     simple_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified"
     gaussian_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Test_corpus_with_gaussian_using_momentum_heuristics"
-
+    simple_corpus_path_copy=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified - Copy"
     runner = RunDetectionTests(
         corpus_path=simple_corpus_path
     )
 
     # run all methods with default param grids
-    summaries = runner.run(verbose=False)
-
-    # print the full table
-    RunDetectionTests.print_summary(summaries)
-
-    # find best threshold per method by F1
-    #runner.best_params(summaries, metric='f1', side='combined')
+    summaries, found = run_recursive_data_cleaning(
+        recursive_range=(0, 1, 2, 3, 4, 5))
     
+    print(summaries)
+    
+    # saves sumaries 
+    with open(r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\recursive_cleaning_summaries.json", 'w', encoding='utf-8') as f:
+        json.dump([dataclasses.asdict(s) for s in summaries], f, indent=2)
+
     '''
     print("Gaussian placement corpus:")
     RunDetectionTests.performance_by_swap_size(summaries, metric='f1', side='combined')

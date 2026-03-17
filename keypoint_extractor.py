@@ -9,7 +9,8 @@ import subprocess
 from PIL import Image
 import numpy as np
 from Validators.orientation_validator import orientation_checker
-from keypoint_validator import CubicSplineKeyPointInterpolator
+from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
+from copy import deepcopy
 
 class KeyPointExtractor:
     '''Extracts pose and hand keypoints from videos using MediaPipe
@@ -153,11 +154,13 @@ class KeyPointExtractor:
 
         # Detect rotation
         rotation_checker = orientation_checker()
-        
         rotation_angle = rotation_checker.get_rotation_metadata(filename)
-        print(f"  Detected rotation: {rotation_angle}°")
         
-        metadata = self.extract_metadata(cap)
+        # assums sign corisponding to folder name, and video id corresponding to file name
+        sigh = Path(filename).parent.name
+        video_id = Path(filename).stem
+        
+        metadata = self.extract_metadata(cap, video_id=video_id, sign=sigh  )
         metadata["rotation_applied"] = rotation_angle
         frames = []
 
@@ -174,22 +177,23 @@ class KeyPointExtractor:
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pose_keypoints = self.extract_pose(image_rgb)
             hand_keypoints, maltiple_hands = self.extract_hand(image_rgb, frame_index)
-            anomalous_hands.append(maltiple_hands)
+            if len(maltiple_hands) > 0:
+                # concatenate anomalous hands to main list with frame index for later handling
+                anomalous_hands.extend(maltiple_hands)
+                
             frames.append({
                 "frame_index": frame_index,
                 "timestamp": frame_index / fps if fps else None,
                 "pose": pose_keypoints,
                 "hands": hand_keypoints
             })
+            
 
             frame_index += 1
             ret, frame = cap.read()
 
         cap.release()
         
-        if len(anomalous_hands) > 0:
-            self.handle_anomalous_hands(frames, anomalous_hands, filepath)
-
         output = {
             "metadata": metadata,
             "frames": frames
@@ -200,24 +204,37 @@ class KeyPointExtractor:
 
         with open(filepath, "w") as f:
             json.dump(output, f, indent=2)
-        print(f"  Keypoints saved to {filepath}")
         
+        if len(anomalous_hands) > 0:
+            self.handle_simultaneous_hands(anomalous_hands, filepath)
+
+        print(f"  Keypoints saved to {filepath}")
+
         return output
     
-    def handle_simultaneous_hands(self, frames, anomalous_hands, filepath):
-        '''Handles cases where maltiples sets of keypoints in a single instance of a hand
+    def handle_simultaneous_hands(self, anomalous_hands, filepath):
+        '''takes cases where maltiples sets of keypoints in a single instance of a hand
+        removes them from the main dataset and stores them within metadata for later use in the insertion validator.
         takes: 
-            frames: all extracted frames
-            anomalous_hands: all points where this happens
+            anomalous_hands: all points where this happens, held as 
+            filepath: path to the json file where the current version is 
+                to be updated with corrected keypoints
+        
         '''
-        validator = CubicSplineKeyPointInterpolator()
-        missing_hands = CubicSplineKeyPointInterpolator.checkForMissingHands()
+        # open json file and load data
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        
         for indx, side in anomalous_hands:
-            # split sets of keypoints into seperate sets
-            swapped = (indx, 'right' if side == 'left' else 'left')
-            if swapped in missing_hands:
-                pass
-            # splits  
+            # copys full frame of data into array of anomalous frames in metadata
+            data['metadata'].setdefault('simultaneous_hands_frames', []).append(deepcopy(data['frames'][indx]))
+            # removes hand keypoints from main dataset
+            data['frames'][indx]['hands'][side] = []
+        # saves updated json file
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+            
+
             
     def extract_all(self, directory, output_directory):
         '''
