@@ -549,9 +549,7 @@ def run_recursive_data_cleaning(
             ))
 
     return [s for s in level_summaries.values()], found
-                    
-            
-        
+
 if __name__ == "__main__":
     uniform_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Uniform_uniform"
     simple_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified"
