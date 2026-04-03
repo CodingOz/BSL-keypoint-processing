@@ -66,7 +66,7 @@ class KeyPointValidator:
         
         self.frames = self.data.get('frames', [])
 
-    def checkForSimultaneousHands(self, showLogs = False):
+    def checkForSimultaneousHands(self, show_logs = False):
         found_error = False
         
         errors = []
@@ -94,7 +94,7 @@ class KeyPointValidator:
                 duplicate_pairs = {pair: count for pair, count in pair_counts.items() if count > 1}
                 if duplicate_pairs:
                     found_error = True
-                    if showLogs:
+                    if show_logs:
                         print(
                             f"Simultaneous {side} hands detected in frame {frame_index} "
                             f"(timestamp={timestamp}): duplicate pairs={duplicate_pairs}"
@@ -103,7 +103,7 @@ class KeyPointValidator:
                     errors.append((frame_index, side))
         return errors
     
-    def checkForMissingHands(self, showLogs=False):
+    def checkForMissingHands(self, show_logs=False):
         found_error = False
         
         errors = []
@@ -117,7 +117,7 @@ class KeyPointValidator:
                 landmarks = hands.get(side, []) if isinstance(hands, dict) else []
                 if not landmarks:
                     found_error = True
-                    if showLogs:
+                    if show_logs:
                         print(f"missing {side} hand detected in frame {frame_index} (timestamp={timestamp})")
                     errors.append((frame_index, side))
         return errors
@@ -134,7 +134,7 @@ class KeyPointValidator:
         
    # ------ setter functions for palm centers, momentum and acceleration --------
     
-    def findPalmCenters(self, frameIdx, showLogs=False):
+    def findPalmCenters(self, frameIdx, show_logs=False):
         # computes the average position of the palm points 
         # (landmark_id in [0, 1, 2, 5, 9, 13, 17]) for each hand
         # in the specified frame
@@ -152,11 +152,11 @@ class KeyPointValidator:
                     avg_x = sum(lm['x'] for lm in palm_points) / len(palm_points)
                     avg_y = sum(lm['y'] for lm in palm_points) / len(palm_points)
                     palmCenters[side] = [avg_x, avg_y]
-                    if showLogs:
+                    if show_logs:
                         print(f"Frame {frameIdx}, {side}: Found {len(palm_points)} palm points, center: [{avg_x:.3f}, {avg_y:.3f}]")
                 else:
                     palmCenters[side] = [None, None]
-                    if showLogs:
+                    if show_logs:
                         print(f"Frame {frameIdx}, {side}: No palm points found (landmarks: {len(landmarks)})")
             
             return palmCenters
@@ -166,18 +166,18 @@ class KeyPointValidator:
             traceback.print_exc()
             return {}
 
-    def findAllPalmCenters(self, showLogs=False):
+    def findAllPalmCenters(self, show_logs=False):
         self.__palms = []
         
         for i in range(len(self.frames)):
-            self.palmCenters = self.findPalmCenters(i, showLogs=showLogs)
+            self.palmCenters = self.findPalmCenters(i, show_logs=show_logs)
             self.__palms.append(self.palmCenters)
         
         return self.__palms
     
-    def findMomentum(self, palms, palms2, showLogs=False):
+    def findMomentum(self, palms, palms2, show_logs=False):
         
-        if showLogs:
+        if show_logs:
             print(f"Frame palms 1: {palms}")
             print(f"Frame palms 2: {palms2}")
         
@@ -214,22 +214,22 @@ class KeyPointValidator:
             }
         }
 
-    def storeMomentum(self, showLogs=False):
+    def storeMomentum(self, show_logs=False):
         # stores the momentum values in an array as a class atribute
         self.__momentums = []
         for i in range(len(self.frames)-1):
             if self.__palms is None:
-                self.findAllPalmCenters(showLogs=showLogs)
+                self.findAllPalmCenters(show_logs=show_logs)
             
             palms = self.__palms[i] if i < len(self.__palms) \
                 else self.findPalmCenters(i)
             palms2 = self.__palms[i+1] if i+1 < len(self.__palms) \
-                else self.findPalmCenters(i+1, showLogs=showLogs)
+                else self.findPalmCenters(i+1, show_logs=show_logs)
         
-            momentum = self.findMomentum(palms, palms2, showLogs=showLogs)
+            momentum = self.findMomentum(palms, palms2, show_logs=show_logs)
             self.__momentums.append(momentum)
             
-    def computeAcceleration(self, palms, palms2, palms3, showLogs=False): 
+    def computeAcceleration(self, palms, palms2, palms3, show_logs=False): 
         """
         Compute acceleration with robustness against missing palm centers.
         Uses constant acceleration assumption to estimate missing momentum values.
@@ -248,8 +248,8 @@ class KeyPointValidator:
         
         # Get momentums with estimation tracking
         
-        momentum_1 = self.findMomentum(palms, palms2, showLogs=showLogs)
-        momentum_2 = self.findMomentum(palms3, palms2, showLogs=showLogs)  # Use palms2 as second palm for momentum_2
+        momentum_1 = self.findMomentum(palms, palms2, show_logs=show_logs)
+        momentum_2 = self.findMomentum(palms3, palms2, show_logs=show_logs)  # Use palms2 as second palm for momentum_2
         
         result = {}
         
@@ -336,7 +336,9 @@ class KeyPointValidator:
         return [left, right]
 
     def getSignLenths(self):
-        # return a Sigh_lenths object with filled values
+        ''' return a Sigh_lenths object with filled values
+        
+        '''
         
         if self.__palms is None:
             self.findAllPalmCenters()
@@ -448,8 +450,7 @@ class KeyPointValidator:
         
         return left_clusters, right_clusters
 
-
-    def findHandDistancesFromMidpoint(self, frameIdx, midpoint=0.5, showLogs=False) -> dict:
+    def findHandDistancesFromMidpoint(self, frameIdx, midpoint=0.5, show_logs=False) -> dict:
         """
         Returns how far each hand sits from the screen midpoint, signed by side.
         Left hand: positive = left of midpoint (expected), negative = crossed over right
@@ -463,7 +464,7 @@ class KeyPointValidator:
                 'right': float | None,   # right_x  - midpoint
             }
         """
-        palms = self.findPalmCenters(frameIdx, showLogs=showLogs)
+        palms = self.findPalmCenters(frameIdx, show_logs=show_logs)
 
         result = {'left': None, 'right': None}
 
@@ -475,14 +476,13 @@ class KeyPointValidator:
         if right and right != [None, None] and None not in right:
             result['right'] = round(right[0] - midpoint, 6)
 
-        if showLogs:
+        if show_logs:
             print(f"Frame {frameIdx} | midpoint={midpoint} | "
                 f"left dist={result['left']}  right dist={result['right']}")
 
         return result
 
-
-    def findAllHandDistancesFromMidpoint(self, midpoint=0.5, showLogs=False) -> list[dict]:
+    def findAllHandDistancesFromMidpoint(self, midpoint=0.5, show_logs=False) -> list[dict]:
         """
         Runs findHandDistancesFromMidpoint across every frame.
 
@@ -494,12 +494,11 @@ class KeyPointValidator:
 
         frames = self.data.get('frames', [])
         return [
-            self.findHandDistancesFromMidpoint(i, midpoint=midpoint, showLogs=showLogs)
+            self.findHandDistancesFromMidpoint(i, midpoint=midpoint, show_logs=show_logs)
             for i in range(len(frames))
         ]
 
-
-    def findAdaptiveMidpoint(self, showLogs=False) -> float:
+    def findAdaptiveMidpoint(self, show_logs=False) -> float:
         """
         Computes the empirical horizontal centre of the signer by averaging
         the x-coordinates of ALL visible palm centers across ALL frames.
@@ -521,19 +520,18 @@ class KeyPointValidator:
                     all_x.append(pos[0])
 
         if not all_x:
-            if showLogs:
+            if show_logs:
                 print("No visible palms found — falling back to midpoint=0.5")
             return 0.5
 
         adaptive = float(np.mean(all_x))
 
-        if showLogs:
+        if show_logs:
             print(f"Adaptive midpoint: {adaptive:.4f}  (computed from {len(all_x)} palm observations)")
 
         return adaptive
 
-
-    def findAllHandDistancesFromAdaptiveMidpoint(self, showLogs=False) -> tuple[list[dict], float]:
+    def findAllHandDistancesFromAdaptiveMidpoint(self, show_logs=False) -> tuple[list[dict], float]:
         """
         Computes the adaptive midpoint from palm data, then returns distances
         for every frame using that midpoint.
@@ -543,8 +541,8 @@ class KeyPointValidator:
             distances: list of {'left': float|None, 'right': float|None}, one per frame
             adaptive_midpoint: the empirically derived centre used
         """
-        midpoint = self.findAdaptiveMidpoint(showLogs=showLogs)
-        distances = self.findAllHandDistancesFromMidpoint(midpoint=midpoint, showLogs=showLogs)
+        midpoint = self.findAdaptiveMidpoint(show_logs=show_logs)
+        distances = self.findAllHandDistancesFromMidpoint(midpoint=midpoint, show_logs=show_logs)
         return distances, midpoint
 
     def flagAbnormalDistances(self, outlier_boundry=-0.1):
@@ -595,7 +593,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
         self.__accelerationsEstimated = None
         self.__momentumsEstimated = None
         
-    def estimateMissingPalmCenters(self, fps=25, showLogs=False):
+    def estimateMissingPalmCenters(self, fps=25, show_logs=False):
         """
         Fill missing palm centers using Kalman filtering.
         
@@ -606,7 +604,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
         
         # Get all palm centers first
         if self._KeyPointValidator__palms is None:
-            self.findAllPalmCenters(showLogs=showLogs)
+            self.findAllPalmCenters(show_logs=show_logs)
         
         # Create Kalman filters with tuned parameters
         kfLeft = HandPositionKalmanFilter(
@@ -650,7 +648,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
                     filled_frame['left'] = updated_position.tolist()
                     estimated['left'] = False
                     
-                    if showLogs and i % 10 == 0:  # Log every 10 frames
+                    if show_logs and i % 10 == 0:  # Log every 10 frames
                         pred = predicted_position
                         meas = left_measurement
                         upd = updated_position
@@ -691,7 +689,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
         self.__filled_palms = filled_centers
         self.__estimation_flags = estimation_flags
         
-        if showLogs:
+        if show_logs:
             # Calculate statistics
             left_estimated = sum(1 for e in estimation_flags if e['left'])
             right_estimated = sum(1 for e in estimation_flags if e['right'])
@@ -708,16 +706,16 @@ class KalmanKeyPointEstimator(KeyPointValidator):
             self.estimateMissingPalmCenters()
         return self.__filled_palms
     
-    def estimateMissingMomentums(self, showLogs=False):
+    def estimateMissingMomentums(self, show_logs=False):
         if self.__filled_palms is None:
-            self.estimateMissingPalmCenters(showLogs=showLogs)
+            self.estimateMissingPalmCenters(show_logs=show_logs)
         
         # Recompute momentums using filled palm centers
         momentums = []
         for i in range(len(self.__filled_palms)-1):
             palms = self.__filled_palms[i]
             palms2 = self.__filled_palms[i+1]
-            momentum = self.findMomentum(palms, palms2, showLogs=showLogs)
+            momentum = self.findMomentum(palms, palms2, show_logs=show_logs)
             momentums.append(momentum)
         
         return momentums
@@ -727,9 +725,9 @@ class KalmanKeyPointEstimator(KeyPointValidator):
             self.__momentumsEstimated = self.estimateMissingMomentums()
         return self.__momentumsEstimated
     
-    def estimateMissingAccelerations(self, showLogs=False):
+    def estimateMissingAccelerations(self, show_logs=False):
         if self.__filled_palms is None:
-            self.estimateMissingPalmCenters(showLogs=showLogs)
+            self.estimateMissingPalmCenters(show_logs=show_logs)
         accelerations = []
         for i in range(len(self.__filled_palms)-2):
             palms = self.__filled_palms[i]
@@ -738,7 +736,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
             accelerations.append(self.computeAcceleration(palms, 
                                                           palms2, 
                                                           palms3, 
-                                                          showLogs=showLogs))
+                                                          show_logs=show_logs))
         
         return accelerations
     
@@ -755,6 +753,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         self.__estimation_flags = None
         self.__accelerationsEstimated = None
         self.__momentumsEstimated = None
+        self.__hand_distances = None
         self.methods = ['cubic', 'pchip', 'linear']
         if method in self.methods:
             self.method = method
@@ -852,7 +851,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         
         return filled_palms, estimation_flags
     
-    def estimateMissingMomentums(self, showLogs=False):
+    def estimateMissingMomentums(self, show_logs=False):
         if self.__filled_palms is None:
             self.getFilledPalmCenters()
         
@@ -860,7 +859,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         for i in range(len(self.__filled_palms)-1):
             palms = self.__filled_palms[i]
             palms2 = self.__filled_palms[i+1]
-            momentum = self.findMomentum(palms, palms2, showLogs=showLogs)
+            momentum = self.findMomentum(palms, palms2, show_logs=show_logs)
             momentums.append(momentum)
         
         return momentums
@@ -870,7 +869,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
             self.__momentumsEstimated = self.estimateMissingMomentums()
         return self.__momentumsEstimated
     
-    def estimateMissingAccelerations(self, showLogs=False):
+    def estimateMissingAccelerations(self, show_logs=False):
         if self.__filled_palms is None:
             self.getFilledPalmCenters()
         
@@ -882,7 +881,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
             accelerations.append(self.computeAcceleration(palms, 
                                                           palms2, 
                                                           palms3, 
-                                                          showLogs=showLogs))
+                                                          show_logs=show_logs))
         return accelerations
     
     def getEstimatedAccelerations(self):
@@ -922,51 +921,355 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
 
         
         return left_boundrys, right_boundrys
-    
-    def interpolateFullHands(self, start_frame=0, end_frame=None, showLogs=False):
-        '''Interpolate all 41 landmarks for each hand across all frames, not just the palm center.
-           This is a more complex interpolation that can fill in missing fingers as well.
-           
-           Returns:
-               filled_keypoints: list of frames, each with 'left' and 'right' keys containing lists of 41 landmarks
-               estimation_flags: list of frames, each with 'left' and 'right' keys containing lists of booleans indicating which landmarks were estimated
-        '''
         
+    def interpolateFullHands(self, start_frame=0, end_frame=None, show_logs=False):
         keypoint_data = self.getKeyPointsAsLists()
-        
+        end_frame = end_frame if end_frame is not None else len(keypoint_data) - 1
+
         filled_keypoints = []
         estimation_flags = []
-        
+
         for side in ['left', 'right']:
-            # Extract sequences for this hand and all landmarks
-            landmark_sequences = [[] for _ in range(41)]
+            landmark_sequences = [[] for _ in range(21)]  # 21 not 41
             for frame in keypoint_data:
-                for lm_id in range(41):
+                for lm_id in range(21):
                     pos = frame[side][lm_id] if frame[side] else [None, None]
                     landmark_sequences[lm_id].append(pos)
-            
-            # Interpolate each landmark sequence
+
             filled_landmarks = []
-            flags_landmarks = []
-            for lm_id in range(41):
-                filled_positions, was_interpolated = self.interpolateSequence(landmark_sequences[lm_id])
+            flags_landmarks  = []
+            for lm_id in range(21):
+                filled_positions, was_interpolated = self.interpolateSequence(
+                    landmark_sequences[lm_id]
+                )
                 filled_landmarks.append(filled_positions)
                 flags_landmarks.append(was_interpolated)
-            
-            # Reconstruct filled keypoints per frame
+
             for i in range(len(keypoint_data)):
                 if len(filled_keypoints) <= i:
-                    filled_keypoints.append({'left': [[None, None] for _ in range(41)],
-                                            'right': [[None, None] for _ in range(41)]})
-                    estimation_flags.append({'left': [False]*41, 'right': [False]*41})
-                
-                for lm_id in range(41):
-                    filled_keypoints[i][side][lm_id] = filled_landmarks[lm_id][i]
-                    estimation_flags[i][side][lm_id] = flags_landmarks[lm_id][i]
-        
+                    filled_keypoints.append({
+                        'left':  [[None, None] for _ in range(21)],
+                        'right': [[None, None] for _ in range(21)]
+                    })
+                    estimation_flags.append({
+                        'left':  [False] * 21,
+                        'right': [False] * 21
+                    })
+
+                for lm_id in range(21):
+                    # only fill within the requested frame range
+                    if start_frame <= i <= end_frame:
+                        filled_keypoints[i][side][lm_id] = filled_landmarks[lm_id][i]
+                        estimation_flags[i][side][lm_id] = flags_landmarks[lm_id][i]
+
         return filled_keypoints, estimation_flags
+
+    def detectRestPositionFrames(self,
+                                y_threshold_relative=0.15,  # rest is this far below signing space bottom
+                                proximity_threshold=0.15,
+                                min_run_length=3):
+        """
+        Scans inward from edges to find preparation/retraction frames.
+
+        Uses a relative y threshold derived from the signing region rather
+        than an absolute coordinate, so detection works regardless of how
+        high or low the signer sits in frame.
+
+        Frames where only one hand is visible are treated as inconclusive
+        and skipped during the scan rather than treated as non-rest.
+        
+        takes:
+            y_threshold_relative: how far below the signing region bottom the rest threshold should be
+            proximity_threshold: if both hands are present and closer than this, it's rest
+            min_run_length: how many consecutive rest frames are needed to confirm a boundary
+        returns:
+            (first_stroke_frame, last_stroke_frame)
+            
+        """
+        if self.__filled_palms is None:
+            self.getFilledPalmCenters()
+
+        lenths = self.getSignLenths()
+        start  = lenths.first_hand
+        end    = lenths.last_hand
+
+        # ── derive relative y threshold from the both-hands signing region ────
+        # collect y values only from frames where both hands are present
+        # to get a clean picture of where active signing happens
+        signing_y_values = []
+        for i in range(lenths.first_with_both, lenths.last_with_both + 1):
+            palms = self.__filled_palms[i]
+            left  = palms.get('left')
+            right = palms.get('right')
+            if (left  and left  != [None, None] and None not in left and
+                right and right != [None, None] and None not in right):
+                signing_y_values.append(left[1])
+                signing_y_values.append(right[1])
+
+        if signing_y_values:
+            # the bottom of the active signing space (highest y value = lowest on screen)
+            signing_y_bottom = np.percentile(signing_y_values, 85)
+            # rest threshold: meaningfully below the signing region
+            y_threshold = signing_y_bottom + y_threshold_relative
+        else:
+            # fallback to absolute if no both-hands region found
+            y_threshold = 0.75
+
+        # frame classifier 
+
+        def classify(i):
+            """
+            Returns:
+                'rest'        — frame confidently looks like rest position
+                'active'      — frame confidently looks like signing
+                'inconclusive'— only one hand present, can't tell
+            """
+            palms = self.__filled_palms[i]
+            left  = palms.get('left')
+            right = palms.get('right')
+
+            left_valid  = left  and left  != [None, None] and None not in left
+            right_valid = right and right != [None, None] and None not in right
+
+            if left_valid and right_valid:
+                both_low  = left[1] > y_threshold and right[1] > y_threshold
+                too_close = math.hypot(right[0] - left[0],
+                                    right[1] - left[1]) < proximity_threshold
+                return 'rest' if (both_low or too_close) else 'active'
+
+            elif left_valid or right_valid:
+                # one hand present — check that hand alone against y threshold
+                hand = left if left_valid else right
+                return 'rest' if hand[1] > y_threshold else 'inconclusive'
+
+            else:
+                return 'inconclusive'
+
+        # scan forward from start
+        first_stroke = start
+        consecutive  = 0
+
+        for i in range(start, end + 1):
+            result = classify(i)
+            if result == 'rest':
+                consecutive += 1
+            elif result == 'inconclusive':
+                continue        # skip — don't reset counter, don't stop
+            else:               # 'active'
+                if consecutive >= min_run_length:
+                    first_stroke = i
+                break
+
+        # ── scan backward from end ────────────────────────────────────────────
+        last_stroke = end
+        consecutive = 0
+
+        for i in range(end, start - 1, -1):
+            result = classify(i)
+            if result == 'rest':
+                consecutive += 1
+            elif result == 'inconclusive':
+                continue
+            else:               # 'active'
+                if consecutive >= min_run_length:
+                    last_stroke = i
+                break
+
+        if first_stroke >= last_stroke:
+            return start, end
+
+        return first_stroke, last_stroke
+    
+    def findPalmDistances(self):
+        """
+        Calculates frame-by-frame distances between filled palm centers.
+        
+        For missing palms, uses the closest known location (last seen position if available).
+        This allows measuring hand proximity even during transition frames where one hand
+        may temporarily disappear.
+        
+        Returns:
+            list of float: distance between left and right palms for each frame,
+                          None for frames where neither palm position is available
+        """
+        if self.__hand_distances is not None:
+            return self.__hand_distances
+        
+        filled_palms, _ = self.getFilledPalmCenters()
+        distances = []
+        
+        # Track last known positions for handling edge cases
+        last_left = None
+        last_right = None
+        
+        for i, frame_palms in enumerate(filled_palms):
+            left = frame_palms.get('left')
+            right = frame_palms.get('right')
+            
+            # Check if positions are valid (not None and not [None, None])
+            left_valid = left and left != [None, None] and None not in left
+            right_valid = right and right != [None, None] and None not in right
+            
+            # Update last known positions
+            if left_valid:
+                last_left = left
+            if right_valid:
+                last_right = right
+            
+            # Use filled positions if valid, otherwise use last known
+            left_pos = left if left_valid else last_left
+            right_pos = right if right_valid else last_right
+            
+            # Calculate distance if both positions are available
+            if left_pos and right_pos:
+                distance = math.hypot(right_pos[0] - left_pos[0], right_pos[1] - left_pos[1])
+                distances.append(distance)
+            else:
+                distances.append(None)
+        
+        self.__hand_distances = distances
+        return distances
+    
+    def find_closest_distances(self):
+        """
+        Finds the closest pair of keypoints (one from left hand, one from right hand)
+        in each frame and returns their distances.
+        
+        For each frame:
+        - Extracts all valid keypoints from left hand (21 landmarks)
+        - Extracts all valid keypoints from right hand (21 landmarks)
+        - Computes distances between all left-right pairs
+        - Returns the minimum distance
+        
+        Returns:
+            list of float: minimum distance between closest left-right keypoint pair per frame,
+                          None for frames where either hand has no valid keypoints
+        """
+        keypoint_data = self.getKeyPointsAsLists()
+        closest_distances = []
+        
+        for frame_idx, frame_keypoints in enumerate(keypoint_data):
+            left_landmarks = frame_keypoints.get('left')
+            right_landmarks = frame_keypoints.get('right')
+            
+            # Ensure we have valid landmark sequences
+            if not left_landmarks or not right_landmarks:
+                closest_distances.append(None)
+                continue
+            
+            # Collect valid left keypoints
+            valid_left = []
+            for lm in left_landmarks:
+                if lm and lm != [None, None] and None not in lm:
+                    valid_left.append(lm)
+            
+            # Collect valid right keypoints
+            valid_right = []
+            for lm in right_landmarks:
+                if lm and lm != [None, None] and None not in lm:
+                    valid_right.append(lm)
+            
+            # If either hand has no valid keypoints, skip this frame
+            if not valid_left or not valid_right:
+                closest_distances.append(None)
+                continue
+            
+            # Find minimum distance between all left-right pairs
+            min_distance = float('inf')
+            for left_kp in valid_left:
+                for right_kp in valid_right:
+                    distance = math.hypot(right_kp[0] - left_kp[0], right_kp[1] - left_kp[1])
+                    if distance < min_distance:
+                        min_distance = distance
+            
+            closest_distances.append(min_distance)
+        
+        return closest_distances
+
 if __name__ == "__main__":
     
+    a = r'''
+    from pathlib import Path
+    from tabulate import tabulate
+    
+    # Define the corpus path
+    corpus_path = Path(r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus')
+    
+    # Collect results
+    results = []
+    errors = []
+    
+    # Process each JSON file in the corpus
+    json_files = sorted(corpus_path.glob('*.json'))
+    
+    print(f"\nProcessing {len(json_files)} sign files from Validated_interpolated_SubCorpus...")
+    print("=" * 80)
+    
+    for json_file in json_files:
+        sign_name = json_file.stem  # filename without .json extension
+        
+        try:
+            # Instantiate interpolator and detect rest position frames
+            interpolator = CubicSplineKeyPointInterpolator(str(json_file))
+            first_stroke, last_stroke = interpolator.detectRestPositionFrames()
+            
+            # Calculate stroke duration
+            stroke_duration = last_stroke - first_stroke + 1
+            
+            results.append({
+                'Sign': sign_name,
+                'First Stroke': first_stroke,
+                'Last Stroke': last_stroke,
+                'Duration': stroke_duration
+            })
+            
+        except Exception as e:
+            errors.append({
+                'Sign': sign_name,
+                'Error': str(e)
+            })
+            print(f"[ERROR] {sign_name}: {str(e)}")
+    
+    # Display results in table format
+    print("\n" + "=" * 80)
+    print("STROKE POSITION DETECTION RESULTS")
+    print("=" * 80)
+    if results:
+        try:
+            print(tabulate(results, headers='keys', tablefmt='grid', showindex=True))
+        except ImportError:
+            # Fallback if tabulate is not available
+            print("\n{:<40} {:<15} {:<15} {:<10}".format('Sign', 'First Stroke', 'Last Stroke', 'Duration'))
+            print("-" * 80)
+            for row in results:
+                print("{:<40} {:<15} {:<15} {:<10}".format(
+                    row['Sign'], row['First Stroke'], row['Last Stroke'], row['Duration']
+                ))
+    
+    # Display summary statistics
+    if results:
+        print("\n" + "=" * 80)
+        print("SUMMARY STATISTICS")
+        print("=" * 80)
+        durations = [r['Duration'] for r in results]
+        print(f"Total signs processed: {len(results)}")
+        print(f"Average stroke duration: {sum(durations) / len(durations):.1f} frames")
+        print(f"Min stroke duration: {min(durations)} frames")
+        print(f"Max stroke duration: {max(durations)} frames")
+    
+    # Display errors if any
+    if errors:
+        print("\n" + "=" * 80)
+        print("PROCESSING ERRORS")
+        print("=" * 80)
+        for error in errors:
+            print(f"  • {error['Sign']}: {error['Error']}")
+    
+    print("=" * 80 + "\n")
+        
+    
+    
+    a = 
     path = r'C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\3e9dd7e5-f6a3-4b1f-9f29-9fba66f0b73c.json'
     path = r"C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\acf7a090-7ece-488a-a6e8-f4df878629a9.json"
     path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified - recursive level 1\1be98b34-0edc-41ee-871c-e592c0b4198f.json"
@@ -986,7 +1289,7 @@ if __name__ == "__main__":
     
     
     
-    '''
+    
     frame = 66
     
     print("palm centers:")
@@ -1006,7 +1309,7 @@ if __name__ == "__main__":
     
     estimator = KalmanKeyPointEstimator(path)
     print("\nFilled palm centers with estimation:")
-    filled_palms, estimation_flags = estimator.estimateMissingPalmCenters(showLogs=False)
+    filled_palms, estimation_flags = estimator.estimateMissingPalmCenters(show_logs=False)
     print(f"Total frames: {len(filled_palms)}")
     
     print("\nEstimated momentums:")
