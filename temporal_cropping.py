@@ -5,7 +5,6 @@ import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
 class TemporalCropping:
-    
     def crop_hands_resting_together(self, json_path, destination_path, show_logs=False):
         '''Crops frames from the start and end of the signing region where both hands are resting together
         using the detectRestPositionFrames to find start and end frames of the signing region 
@@ -464,7 +463,8 @@ class TemporalCropping:
             print(f"Preparation frames: {len(preparation_frames)} (frames {prep_start}-{prep_end})")
             print(f"Stroke frames: {len(stroke_frames)} (frames {sign_start}-{sign_end})")
             print(f"Retraction frames: {len(retraction_frames)} (frames {ret_start}-{ret_end})")
-            
+
+    
     def crop_to_stroke_phase_in_corpus(self, source_corpus, target_corpus, show_logs=False):
         '''Crops frames from the start and end of the signing region to the stroke phase
         for all json files in a corpus using the crop_to_stroke_phase method
