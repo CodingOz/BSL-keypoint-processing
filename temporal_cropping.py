@@ -5,6 +5,69 @@ import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
 class TemporalCropping:
+    def crop_single_handed_frames(self, json_path, destination_path, show_logs=False):
+        '''Crops frames from the start and end of the signing region where only one hand is present
+        
+        takes:
+            json_path: the path to the json file to crop
+            destination_path: the path to save the cropped json file
+            show_logs: whether to print logs of the cropping process'''
+
+        interpolator = CubicSplineKeyPointInterpolator(json_path)
+        lengths = interpolator.getSignLenths()
+        start_frame = lengths.first_with_both
+        end_frame = lengths.last_with_both
+        
+        # Load the JSON file
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        if show_logs:
+            print(f"{json_path}: Cropping frames from {start_frame} to {end_frame} where both hands are present.")
+        
+        # empty hand frames before start_frame and after end_frame
+        cropped_frames = data['frames'][start_frame:end_frame + 1]
+        
+        for frame in data['frames'][:start_frame]:
+            frame['hands']['left'] = []
+            frame['hands']['right'] = []
+        
+        for frame in data['frames'][end_frame + 1:]:
+            frame['hands']['left'] = []
+            frame['hands']['right'] = []
+        
+        # update metadata with number of frames cropped from start and end
+        frames_cropped_start = start_frame
+        frames_cropped_end = len(data['frames']) - end_frame - 1
+        data['metadata']['frames_cropped_start'] = frames_cropped_start
+        data['metadata']['frames_cropped_end'] = frames_cropped_end
+        data['frames'] = cropped_frames
+        
+        # save to destination path
+        Path(destination_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(destination_path, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+    def crop_single_handed_frames_in_corpus(self, source_corpus, target_corpus, show_logs=False):
+        '''Crops frames from the start and end of the signing region where only one hand is present
+        for all json files in a corpus using the crop_single_handed_frames method
+        takes:
+            source_corpus: the path to the corpus of json files to crop
+            target_corpus: the location where the cropped json files are to be generated to
+            show_logs: whether to print logs of the cropping process'''
+        
+        source_corpus = Path(source_corpus)
+        target_corpus = Path(target_corpus)
+        target_corpus.mkdir(parents=True, exist_ok=True)
+
+        for json_path in source_corpus.rglob('*.json'):
+            # mirror the subdirectory structure in the target corpus
+            relative_path = json_path.relative_to(source_corpus)
+            output_path   = target_corpus / relative_path
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            self.crop_single_handed_frames(str(json_path), str(output_path), show_logs=show_logs)
+    
     def crop_hands_resting_together(self, json_path, destination_path, show_logs=False):
         '''Crops frames from the start and end of the signing region where both hands are resting together
         using the detectRestPositionFrames to find start and end frames of the signing region 
@@ -67,7 +130,6 @@ class TemporalCropping:
             print(f"Original frame count: {original_total_frames}")
             print(f"New frame count: {len(cropped_frames)}")
     
-    
     def crop_hands_resting_together_in_corpus(self, source_corpus, target_corpus, show_logs=False):
         '''Crops frames from the start and end of the signing region where both hands are resting together
         for all json files in a corpus using the crop_hands_resting_together method
@@ -88,12 +150,12 @@ class TemporalCropping:
 
             self.crop_hands_resting_together(str(json_path), str(output_path), show_logs=show_logs) 
 
-
     def segment_sign_phases( self,
         palm_distances: np.ndarray,
         momentum_left: np.ndarray,
         momentum_right: np.ndarray,
         closest_distances: np.ndarray,
+        hand_scales: np.ndarray,
         *,
         # Stage 1 parameters
         smoothing_sigma: float = 2.5,
@@ -107,52 +169,44 @@ class TemporalCropping:
         Segment a BSL fingerspelling recording into preparation, sign, and
         retraction phases.
 
-        Parameters
-        ----------
-        palm_distances : array-like, shape (n_frames,)
-            Per-frame distance between palm centres (normalised to image coords,
-            so values are roughly in [0, 1]).
-        momentum_left : array-like, shape (n_frames,)
-            Per-frame velocity magnitude of the left palm.
-        momentum_right : array-like, shape (n_frames,)
-            Per-frame velocity magnitude of the right palm.
-        closest_distances : array-like, shape (n_frames,)
-            Per-frame minimum pairwise distance between any left and right
-            hand keypoint.
+        takes:
+            palm_distances: array-like, shape (n_frames,)
+                Per-frame distance between palm centres (normalised to image coords,
+                so values are roughly in [0, 1]).
+            momentum_left: array-like, shape (n_frames,)
+                Per-frame velocity magnitude of the left palm.
+            momentum_right: array-like, shape (n_frames,)
+                Per-frame velocity magnitude of the right palm.
+            closest_distances: array-like, shape (n_frames,)
+                Per-frame minimum pairwise distance between any left and right
+                hand keypoint.
 
-        smoothing_sigma : float
-            Standard deviation (in frames) of the Gaussian kernel applied to
-            the momentum signal in Stage 1.  Increase for noisier recordings.
-            Default 2.5.
-        rise_threshold_fraction : float  (0 < value < 1)
-            Stage 1 coarse boundary.  Walking outward from the valley minimum,
-            the boundary is placed at the first frame where the normalised
-            momentum rises above  min + rise_threshold_fraction * (max - min).
-            Default 0.25 (25 % of the recording's dynamic momentum range).
-        min_sign_frames : int
-            Minimum acceptable width of the sign phase in frames.  If Stage 1
-            or Stage 2 produce a narrower window it is expanded symmetrically
-            to this width.  Default 5.
-        composite_halfmax_fraction : float  (0 < value < 1)
-            Stage 2 refinement.  The refined boundary is the outermost frame
-            (within the search window) at which the composite score exceeds
-            composite_halfmax_fraction * (local peak composite score).
-            Default 0.50 (half-maximum criterion).
-        refinement_search_window : int
-            Number of frames on each side of the Stage 1 boundary that Stage 2
-            is allowed to search.  Default 10.
+            smoothing_sigma: float
+                Standard deviation (in frames) of the Gaussian kernel applied to
+                the momentum signal in Stage 1.  Increase for noisier recordings.
+                Default 2.5.
+            rise_threshold_fraction: float  (0 < value < 1)
+                Stage 1 coarse boundary.  Walking outward from the valley minimum,
+                the boundary is placed at the first frame where the normalised
+                momentum rises above  min + rise_threshold_fraction * (max - min).
+                Default 0.25 (25 % of the recording's dynamic momentum range).
+            min_sign_frames: int
+                Minimum acceptable width of the sign phase in frames.  If Stage 1
+                or Stage 2 produce a narrower window it is expanded symmetrically
+                to this width.  Default 5.
+            composite_halfmax_fraction : float  (0 < value < 1)
+                Stage 2 refinement.  The refined boundary is the outermost frame
+                (within the search window) at which the composite score exceeds
+                composite_halfmax_fraction * (local peak composite score).
+                Default 0.50 (half-maximum criterion).
+            refinement_search_window : int
+                Number of frames on each side of the Stage 1 boundary that Stage 2
+                is allowed to search.  Default 10.
 
-        Returns
-        -------
-        dict with keys 'preparation', 'sign', 'retraction', each mapping to a
-        (start_frame, end_frame) tuple of inclusive integer frame indices.
-        The three phases tile the recording without overlap or gap.
-
-        Raises
-        ------
-        ValueError
-            If the input arrays have inconsistent lengths or the recording is
-            too short for meaningful segmentation.
+        Returns:
+            dict with keys 'preparation', 'sign', 'retraction', each mapping to a
+            (start_frame, end_frame) tuple of inclusive integer frame indices.
+            The three phases tile the recording without overlap or gap.
         """
 
 
@@ -181,7 +235,7 @@ class TemporalCropping:
             rise_threshold_fraction=rise_threshold_fraction,
             min_sign_frames=min_sign_frames,
         )
-
+        print("points from stage 1 valley detection: ", sign_start_coarse, sign_end_coarse)
         # Stage 2 - Boundary refinement via composite sign-presence score
         sign_start_refined, sign_end_refined = self._stage2_composite_refinement(
             mom_l, mom_r, closest,
@@ -191,13 +245,25 @@ class TemporalCropping:
             search_window=refinement_search_window,
             min_sign_frames=min_sign_frames,
         )
+        print("points from stage 2 refinement: ", sign_start_refined, sign_end_refined)
+        
+        # Stage 3 - Expand to include nearby frames with close hand proximity
+        sign_start_expanded, sign_end_expanded = self._stage3_expand_by_closest_distance(
+            fine_start=sign_start_refined,
+            fine_end=sign_end_refined,
+            closest=closest,
+            hand_scale=hand_scales['combined'][:-1],
+            combined_momentum=np.maximum(mom_l, mom_r),
+        )
 
+        print("points from stage 3 expansion: ", sign_start_expanded, sign_end_expanded)
+        
         # Assemble output phases
         # Phases tile the recording: [0 … sign_start-1] | [sign_start … sign_end]
         prep_start = 0
-        prep_end   = sign_start_refined - 1
-        ret_start  = sign_end_refined   + 1
-        ret_end    = n - 1
+        prep_end = sign_start_expanded - 1
+        ret_start = sign_end_expanded + 1
+        ret_end = n - 1
 
         # Edge case: if the sign extends to frame 0 there is no preparation,
         # and if it extends to the last frame there is no retraction.
@@ -209,10 +275,9 @@ class TemporalCropping:
 
         return {
             "preparation": (int(prep_start), int(prep_end)),
-            "sign":        (int(sign_start_refined), int(sign_end_refined)),
+            "sign":        (int(sign_start_expanded), int(sign_end_expanded)),
             "retraction":  (int(ret_start), int(ret_end)),
         }
-
 
     def _stage1_valley_detection(
         self,
@@ -275,7 +340,6 @@ class TemporalCropping:
         )
 
         return sign_start, sign_end
-
 
     def _stage2_composite_refinement(
         self,
@@ -362,7 +426,106 @@ class TemporalCropping:
 
         return refined_start, refined_end
 
+    def _stage3_expand_by_closest_distance(
+        self,
+        fine_start: int,
+        fine_end: int,
+        closest: np.ndarray,
+        hand_scale: np.ndarray,
+        combined_momentum: np.ndarray,
+        *,
+        # Fraction of the median in-sign proximity that the boundary
+        # must drop below before expansion stops.
+        # 0.4 means: stop when proximity falls below 40% of the typical
+        # in-sign proximity — adaptive to each recording.
+        exit_fraction: float = 0.4,
+        # Smooth the proximity signal before thresholding
+        smoothing_sigma: float = 1.5,
+        # Require this many consecutive sub-threshold frames to confirm
+        # the boundary, preventing a single noisy dip from halting expansion
+        min_consecutive_exit: int = 3,
+        # Never expand past frames where momentum exceeds this percentile
+        # of the preparation-region momentum (guards against bleeding into
+        # genuine preparation / retraction phases)
+        momentum_guard_percentile: float = 60.0,
+    ) -> tuple[int, int]:
+        """
+        Expand Stage 2 boundaries outward by walking until the normalised
+        inter-hand proximity drops below an adaptive threshold derived from
+        the median proximity within the confirmed sign window.
 
+        Uses a consecutive-frames exit criterion rather than a single-frame
+        threshold crossing to avoid stopping on isolated interpolation noise.
+        """
+        n = len(closest)
+
+        # --- 1. Build normalised proximity signal ----------------------------
+        scale = np.where(hand_scale > 1e-6, hand_scale, 1e-6)
+        proximity = np.clip(1.0 - (closest / scale), 0.0, 1.0)
+        proximity = gaussian_filter1d(proximity, sigma=smoothing_sigma)
+
+        # --- 2. Derive adaptive threshold from the confirmed sign window -----
+        # The Stage 2 window is our ground truth for what "in-sign" looks like.
+        sign_proximity = proximity[fine_start:fine_end + 1]
+        if len(sign_proximity) == 0 or np.median(sign_proximity) < 1e-6:
+            # Proximity signal is flat / degenerate — nothing to expand on
+            return fine_start, fine_end
+
+        threshold = exit_fraction * np.median(sign_proximity)
+
+        # --- 3. Momentum guard -----------------------------------------------
+        prep_region = combined_momentum[:fine_start]
+        mom_cap = (np.percentile(prep_region, momentum_guard_percentile)
+                if len(prep_region) >= 3 else np.inf)
+
+        # --- 4. Walk left from fine_start ------------------------------------
+        expanded_start = fine_start
+        consecutive_exit = 0
+
+        for t in range(fine_start - 1, -1, -1):
+            if combined_momentum[t] > mom_cap:
+                # Hit the momentum guard — hard stop
+                break
+            if proximity[t] < threshold:
+                consecutive_exit += 1
+                if consecutive_exit >= min_consecutive_exit:
+                    # Confirmed exit: boundary is just before this run started
+                    expanded_start = t + min_consecutive_exit
+                    break
+            else:
+                consecutive_exit = 0
+                expanded_start = t
+        
+        # --- 5. Walk right from fine_end -------------------------------------
+        ret_region = combined_momentum[fine_end + 1:]
+        mom_cap_ret = (np.percentile(ret_region, momentum_guard_percentile)
+                    if len(ret_region) >= 3 else np.inf)
+
+        expanded_end = fine_end
+        consecutive_exit = 0
+
+        for t in range(fine_end + 1, n):
+            if combined_momentum[t] > mom_cap_ret:
+                break
+            if proximity[t] < threshold:
+                consecutive_exit += 1
+                if consecutive_exit >= min_consecutive_exit:
+                    expanded_end = t - min_consecutive_exit
+                    break
+            else:
+                consecutive_exit = 0
+                expanded_end = t
+
+        # --- 6. Sanity clamp -------------------------------------------------
+        # Never contract below Stage 2 boundaries
+        expanded_start = min(expanded_start, fine_start)
+        expanded_end   = max(expanded_end,   fine_end)
+
+        expanded_start = max(0, expanded_start)
+        expanded_end   = min(n - 1, expanded_end)
+
+        return int(expanded_start), int(expanded_end)
+     
     def _enforce_min_width(self, start: int, end: int, min_frames: int, n: int) -> tuple[int, int]:
         """
         Expand (start, end) symmetrically if the window is narrower than
@@ -376,7 +539,6 @@ class TemporalCropping:
             start = max(0, start - expand_left)
             end   = min(n - 1, end + expand_right)
         return start, end
-
 
     def crop_to_stroke_phase(self, json_path, destination_path, show_logs=False):
         '''Crops frames from the start and end of the signing region to the stroke phase
@@ -397,12 +559,15 @@ class TemporalCropping:
         momentums = validator.getEstimatedMomentums()
         left_momentum = [momentum['left']['magnitude'] for momentum in momentums]
         right_momentum = [momentum['right']['magnitude'] for momentum in momentums]
-        
+        hand_scales     = validator.getHandScales()
+       
         phases = self.segment_sign_phases(
             palm_distances,
             left_momentum,
             right_momentum,
-            closest_distances)
+            closest_distances,
+            hand_scales
+            )
         
         # Load the JSON file
         with open(json_path, 'r') as f:
@@ -464,7 +629,6 @@ class TemporalCropping:
             print(f"Stroke frames: {len(stroke_frames)} (frames {sign_start}-{sign_end})")
             print(f"Retraction frames: {len(retraction_frames)} (frames {ret_start}-{ret_end})")
 
-    
     def crop_to_stroke_phase_in_corpus(self, source_corpus, target_corpus, show_logs=False):
         '''Crops frames from the start and end of the signing region to the stroke phase
         for all json files in a corpus using the crop_to_stroke_phase method

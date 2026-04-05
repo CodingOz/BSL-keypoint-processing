@@ -3,6 +3,8 @@ import math
 import traceback
 import os
 import numpy as np
+from scipy.signal import medfilt
+
 
 import sys
 from pathlib import Path
@@ -1186,8 +1188,41 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         
         return closest_distances
 
+    def getHandScales(self, smoothing_window=5):
+        # Enforce odd window for medfilt
+        if smoothing_window % 2 == 0:
+            smoothing_window += 1
+
+        keypoint_data = self.getKeyPointsAsLists()
+        n = len(keypoint_data)
+
+        left_scales  = np.empty(n)
+        right_scales = np.empty(n)
+
+        for frame_idx, frame in enumerate(keypoint_data):
+            for side, out_array in (('left', left_scales), ('right', right_scales)):
+                landmarks = frame[side]  # list of 41 [x, y] entries; all valid at this stage
+
+                wrist  = landmarks[0]   # landmark 0 — wrist
+                mid_tip = landmarks[12] # landmark 12 — middle fingertip
+
+                out_array[frame_idx] = math.hypot(
+                    mid_tip[0] - wrist[0],
+                    mid_tip[1] - wrist[1],
+                )
+
+        # Median-filter each hand's scale sequence independently
+        left_smoothed  = medfilt(left_scales,  kernel_size=smoothing_window).astype(float)
+        right_smoothed = medfilt(right_scales, kernel_size=smoothing_window).astype(float)
+        combined       = np.maximum(left_smoothed, right_smoothed)
+
+        return {
+            'left':     left_smoothed,
+            'right':    right_smoothed,
+            'combined': combined,
+        }
+
 if __name__ == "__main__":
-    
     a = r'''
     from pathlib import Path
     from tabulate import tabulate
