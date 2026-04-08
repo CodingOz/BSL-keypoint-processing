@@ -10,7 +10,9 @@
     "frame_count": 125,
     "codec": 875967080,
     "mediapipe_version": "0.10.21",
-    "rotation_applied": 0
+    "rotation_applied": 0,
+    "dominance_label": "right",
+    "swapped_dominance": false
   },
   "frames": [
     {

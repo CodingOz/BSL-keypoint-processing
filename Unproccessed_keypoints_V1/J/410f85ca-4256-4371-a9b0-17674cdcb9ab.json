@@ -3579,7 +3579,9 @@
           ]
         }
       }
-    ]
+    ],
+    "dominance_label": "right",
+    "swapped_dominance": false
   },
   "frames": [
     {
