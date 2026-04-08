@@ -7,6 +7,7 @@ import os
 from video_file_manager import VideoManager
 from PIL import Image
 import numpy as np
+import subprocess
 from Validators.orientation_validator import orientation_checker
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from copy import deepcopy
@@ -526,17 +527,3 @@ class KeyPointExtractorV2:
         code = rotations.get(angle)
         return cv2.rotate(frame, code) if code is not None else frame
 
-
-if __name__ == "__main__":
-    Extractor = KeyPointExtractorV1()
-
-    Extractor.extract_all(
-        directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/videoCorpus_sorted",
-        output_directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/KeypointCorpus_V1"
-    )
-    
-    ExtractorV2 = KeyPointExtractorV2()
-    ExtractorV2.extract_all(
-        directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/videoCorpus_sorted",
-        output_directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/KeypointCorpus_V2"
-    )
