@@ -5,14 +5,13 @@ import mediapipe as mp
 from pathlib import Path
 import os
 from video_file_manager import VideoManager
-import subprocess
 from PIL import Image
 import numpy as np
 from Validators.orientation_validator import orientation_checker
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from copy import deepcopy
 
-class KeyPointExtractor:
+class KeyPointExtractorV1:
     '''Extracts pose and hand keypoints from videos using MediaPipe
     
     atributes:
@@ -157,10 +156,10 @@ class KeyPointExtractor:
         rotation_angle = rotation_checker.get_rotation_metadata(filename)
         
         # assums sign corisponding to folder name, and video id corresponding to file name
-        sigh = Path(filename).parent.name
+        sign = Path(filename).parent.name
         video_id = Path(filename).stem
         
-        metadata = self.extract_metadata(cap, video_id=video_id, sign=sigh  )
+        metadata = self.extract_metadata(cap, video_id=video_id, sign=sign)
         metadata["rotation_applied"] = rotation_angle
         frames = []
 
@@ -290,15 +289,254 @@ class KeyPointExtractor:
         elif angle == 270:
             return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
         return frame
-      
-Extractor = KeyPointExtractor()
+
+# keypoint_extractor.py  –  fixed original (MediaPipe legacy)
 
 
-Extractor.extract_all(
-    directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/videoCorpus_sorted",
-    output_directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/KeypointCorpus_unprocessed"
-)
+class KeyPointExtractorV2:
+    """Extracts hand keypoints from videos using MediaPipe (legacy API).
+
+    Attributes:
+        mp_hands: MediaPipe hands solution namespace
+        hands:    Initialized MediaPipe Hands model
+    Methods:
+        extract_hand:              Extracts hand keypoints from a single RGB frame
+        extract_metadata:          Extracts video metadata from an OpenCV capture
+        extract_to_json:           Processes one video and writes keypoints to JSON
+        handle_simultaneous_hands: Quarantines frames with duplicate hand labels
+        extract_all:               Walks a directory and processes every video
+        rotate_frame:              Rotates a frame by 90 / 180 / 270 degrees
+    """
+
+    def __init__(self):
+        self.mp_hands = mp.solutions.hands
+        self.hands = self.mp_hands.Hands(
+            static_image_mode=False,
+            max_num_hands=2,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
+
+    def extract_hand(self, image_rgb, frame_index):
+        """Extract hand keypoints from a single RGB frame.
+
+        Args:
+            image_rgb:   Frame in RGB format (numpy array).
+            frame_index: Index of the current frame (used for anomaly logging).
+
+        Returns:
+            hands_data (dict):      {"left": [...], "right": [...]} each entry is a
+                                    list of landmark dicts with keys cluster_id,
+                                    landmark_id, x, y, z.
+            anomalous_hands (list): (frame_index, label) tuples where the same hand
+                                    label appeared more than once in a single frame.
+        """
+        hands_data = {"left": [], "right": []}
+        anomalous_hands = []
+
+        results = self.hands.process(image_rgb)
+        if not results.multi_hand_landmarks:
+            return hands_data, anomalous_hands
+
+        for hand_landmarks, handedness in zip(
+            results.multi_hand_landmarks,
+            results.multi_handedness,
+        ):
+            label = handedness.classification[0].label.lower()
+            cluster_id = 0 if label == "left" else 1
+
+            # FIX: MediaPipe always returns exactly 21 landmarks, so
+            # `len(...) > 21` never fires.  The real anomaly is the same
+            # hand label appearing twice in one frame.
+            if hands_data[label]:
+                anomalous_hands.append((frame_index, label))
+                continue  # discard the duplicate detection
+
+            for idx, lm in enumerate(hand_landmarks.landmark):
+                hands_data[label].append({
+                    "cluster_id": cluster_id,
+                    "landmark_id": idx,
+                    "x": lm.x,
+                    "y": lm.y,
+                    "z": lm.z,
+                })
+
+        return hands_data, anomalous_hands
+
+    def extract_metadata(self, cap, video_id=None, sign=None):
+        """Build a metadata dict from an OpenCV VideoCapture object.
+
+        Args:
+            cap:      OpenCV VideoCapture (already opened).
+            video_id: Optional identifier string.
+            sign:     Optional sign label string.
+
+        Returns:
+            dict of video metadata.
+        """
+        return {
+            "video_id": video_id,
+            "sign": sign,
+            "resolution": [
+                int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            ],
+            "fps": cap.get(cv2.CAP_PROP_FPS),
+            "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+            "codec": int(cap.get(cv2.CAP_PROP_FOURCC)),
+            "mediapipe_version": mp.__version__,
+        }
+
+    def extract_to_json(self, filename, filepath):
+        """Process one video file and write keypoints to a JSON file.
+
+        Args:
+            filename: Path to the input video file.
+            filepath: Destination path for the output JSON file.
+
+        Returns:
+            The full output dict that was written to JSON.
+        """
+        cap = cv2.VideoCapture(str(filename))
+        if not cap.isOpened():
+            raise RuntimeError(f"Could not open video: {filename}")
+
+        rotation_angle = orientation_checker().get_rotation_metadata(filename)
+
+        sign = Path(filename).parent.name
+        video_id = Path(filename).stem
+
+        metadata = self.extract_metadata(cap, video_id=video_id, sign=sign)
+        metadata["rotation_applied"] = rotation_angle
+
+        frames = []
+        anomalous_hands = []
+        fps = metadata["fps"]
+        frame_index = 0
+
+        ret, frame = cap.read()
+        while ret:
+            if rotation_angle != 0:
+                frame = self.rotate_frame(frame, rotation_angle)
+
+            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            hand_keypoints, multiple_hands = self.extract_hand(image_rgb, frame_index)
+
+            if multiple_hands:
+                anomalous_hands.extend(multiple_hands)
+
+            frames.append({
+                "frame_index": frame_index,
+                "timestamp": frame_index / fps if fps else None,
+                "hands": hand_keypoints,
+            })
+
+            frame_index += 1
+            ret, frame = cap.read()
+
+        cap.release()
+
+        output = {"metadata": metadata, "frames": frames}
+
+        filepath = Path(filepath)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        with open(filepath, "w") as f:
+            json.dump(output, f, indent=2)
+
+        if anomalous_hands:
+            self.handle_simultaneous_hands(anomalous_hands, filepath)
+
+        print(f"  Keypoints saved to {filepath}")
+        return output
+
+    def handle_simultaneous_hands(self, anomalous_hands, filepath):
+        """Quarantine frames where the same hand label was detected twice.
+
+        Copies the full frame into metadata['simultaneous_hands_frames'] and
+        clears the offending hand's keypoints from the main frame list.
+
+        Args:
+            anomalous_hands: List of (frame_index, label) tuples.
+            filepath:        Path to the JSON file to update in-place.
+        """
+        with open(filepath, "r") as f:
+            data = json.load(f)
+
+        for idx, side in anomalous_hands:
+            data["metadata"].setdefault("simultaneous_hands_frames", []).append(
+                deepcopy(data["frames"][idx])
+            )
+            data["frames"][idx]["hands"][side] = []
+
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=2)
+
+    def extract_all(self, directory, output_directory):
+        """Walk *directory* and extract keypoints from every encrypted video.
+
+        Args:
+            directory:        Root directory containing videos.
+            output_directory: Root directory for output JSON files.
+        """
+        video_manager = VideoManager()
+
+        for root, dirs, files in os.walk(directory):
+            if "valid" in dirs:
+                dirs[:] = ["valid"]
+
+            for file in files:
+                if not file.endswith(".mp4.encrypted"):
+                    continue
+
+                parts = file.split("_")
+                if len(parts) > 1:
+                    video_id = parts[1]
+                    sign = parts[-1].split(".")[0]
+                else:
+                    p = file.split(".")
+                    video_id = "manual-" + p[0][-1]
+                    sign = p[0][:-1]
+
+                video_path = os.path.join(root, file)
+                key = video_manager.get_encryption_key()
+                decrypted_path = video_manager.decrypt_file(video_path, key)
+
+                sign_dir = Path(output_directory) / sign
+                sign_dir.mkdir(parents=True, exist_ok=True)
+                output_path = sign_dir / f"{video_id}.json"
+
+                self.extract_to_json(decrypted_path, output_path)
+                video_manager.encrypt_file(decrypted_path, key)
+
+    def rotate_frame(self, frame, angle):
+        """Rotate *frame* by *angle* degrees (must be 90, 180, or 270).
+
+        Args:
+            frame: OpenCV BGR frame.
+            angle: Rotation angle in degrees.
+
+        Returns:
+            Rotated frame, or the original frame if angle is unrecognised.
+        """
+        rotations = {
+            90:  cv2.ROTATE_90_CLOCKWISE,
+            180: cv2.ROTATE_180,
+            270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+        }
+        code = rotations.get(angle)
+        return cv2.rotate(frame, code) if code is not None else frame
 
 
+if __name__ == "__main__":
+    Extractor = KeyPointExtractorV1()
 
-
+    Extractor.extract_all(
+        directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/videoCorpus_sorted",
+        output_directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/KeypointCorpus_V1"
+    )
+    
+    ExtractorV2 = KeyPointExtractorV2()
+    ExtractorV2.extract_all(
+        directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/videoCorpus_sorted",
+        output_directory=r"C:/Users/Oscar Strong/Desktop/finalProgect/KeypointCorpus_V2"
+    )
