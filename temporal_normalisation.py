@@ -3,7 +3,7 @@ import os
 from scipy.interpolate import PchipInterpolator
 import numpy as np
 
-class TemporalNormalisationKeypointAnalysis:
+class TemporalNormalisor:
 
     def MakeNormalisedKeypointFile(self, source_path, target_path, frame_num):
         """
@@ -99,3 +99,28 @@ class TemporalNormalisationKeypointAnalysis:
             json.dump(output, f, indent=2)
 
         return output
+    
+    def NormaliseCorpus(self, source_dir, target_dir, frame_num, show_logs=False):
+        """
+        Normalises all keypoint files in `source_dir` to `frame_num` frames and
+        writes them to `target_dir` with the same filenames.
+
+        takes:
+            source_dir : str | Path
+                Directory containing cleaned keypoint JSON files.
+            target_dir : str | Path
+                Directory at which to write normalised JSON files.
+            frame_num : int
+                Number of output frames for each file.
+            show_logs : bool, optional
+                If True, prints progress logs to console.
+            """
+        os.makedirs(target_dir, exist_ok=True)
+        for filename in os.listdir(source_dir):
+            if filename.endswith('.json'):
+                source_path = os.path.join(source_dir, filename)
+                target_path = os.path.join(target_dir, filename)
+                self.MakeNormalisedKeypointFile(source_path, target_path, frame_num)
+                if show_logs:
+                    print(f"Normalised {filename} to {frame_num} frames.")
+        
