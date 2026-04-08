@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <title>{{ title or "BSL Video Survey" }}</title>
+</head>
+<body>
+
+<div class="header-banner">
+  <div class="container">
+    <h1 class="main-title">British Sign Language Video Survey</h1>
+  </div>
+</div>
+
+<div class="container content-wrapper">
+
+  <div class="info-card">
+    <div class="card-header-custom"><h2>Thank You for Participating!</h2></div>
+    <div class="card-body-custom">
+      <p>I'm making an app for recognising and teaching some basic British Sign Language as
+         my Final Year Project, so need footage of (hopefully) around 70 people doing a few
+         basic signs.</p>
+
+      <div class="privacy-notice">
+        <h3>🔒 Your Privacy is Protected</h3>
+        <p>Your videos <strong>never leave your device</strong>. Hand-keypoint coordinates are
+           extracted directly in your browser using on-device AI, and only those coordinates
+           are sent to the server. The original video is permanently discarded without
+           being uploaded. Here is an example of what the keypoint data looks like:</p>
+        <div class="example-data-wrapper">
+          <iframe src="https://www.youtube-nocookie.com/embed/mesL1xcYnuE"
+                  loading="lazy" allowfullscreen></iframe>
+        </div>
+        <p>The anonymised keypoint data will be used solely for BSL recognition research
+           and will not be shared with third parties.</p>
+      </div>
+
+      <div class="instructions">
+        <h3>Recording Instructions</h3>
+        <ul>
+          <li>Video examples are provided for each sign</li>
+          <li>Please match the general camera angle of the examples</li>
+          <li>Keep all videos under 5 seconds long</li>
+          <li>Keypoint extraction starts automatically once you choose a file — you'll see a
+              green tick when it's ready</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <h2 class="form-title">Record Your BSL Signs</h2>
+
+    <!--
+      No method/action — submission is handled entirely by JS.
+      The CSRF token is still included so Flask-WTF keeps working
+      if you ever re-add server-side processing.
+    -->
+    <form id="survey-form" novalidate>
+      {{ form.hidden_tag() }}
+
+      <div class="video-grid">
+        {% for letter in letters %}
+          {% set field_name = 'video_' ~ letter %}
+          {% set field = form | getattr(field_name) %}
+
+          <div class="video-upload-item" id="slot-{{ letter }}">
+            <div class="upload-label">
+              {{ field.label }}
+              <span class="sign-badge">{{ letter }}</span>
+            </div>
+
+            <div class="tutorial-video-wrapper">
+              <iframe src="{{ video_tutorials[letter] }}"
+                      loading="lazy" allowfullscreen></iframe>
+              <p class="video-caption">Watch tutorial for "{{ letter }}"</p>
+            </div>
+
+            <div class="upload-wrapper">
+              <!--
+                data-slot and data-sign are read by ExtractionQueue.js
+                to identify which sign this input belongs to.
+              -->
+              <input type="file"
+                     id="field-{{ letter }}"
+                     class="form-control-file custom-file-input"
+                     accept="video/*"
+                     capture="user"
+                     data-slot="{{ letter }}"
+                     data-sign="{{ letter }}">
+              <span class="file-chosen" id="filename-{{ letter }}">No file chosen</span>
+            </div>
+
+            <!-- Per-slot extraction status indicator -->
+            <div class="extraction-status" id="status-{{ letter }}" aria-live="polite">
+              <span class="status-icon" id="status-icon-{{ letter }}"></span>
+              <span class="status-text" id="status-text-{{ letter }}">Waiting for video…</span>
+              <progress class="extraction-progress"
+                        id="progress-{{ letter }}"
+                        value="0" max="100"
+                        style="display:none"></progress>
+            </div>
+          </div>
+        {% endfor %}
+
+        <!-- Consent section (unchanged from original) -->
+        <div class="consent-section">
+          <h3 class="consent-title">Consent Agreement</h3>
+          <p class="consent-intro">Please read and agree to the following before submitting:</p>
+          <div class="consent-checkbox-group">
+            <div class="consent-item">
+              {{ form.consent_video_deletion(id="consent1") }}
+              {{ form.consent_video_deletion.label }}
+            </div>
+            <div class="consent-item">
+              {{ form.consent_data_usage(id="consent2") }}
+              {{ form.consent_data_usage.label }}
+            </div>
+          </div>
+          <div id="consent-error" class="error-message" style="display:none">
+            Please agree to both consent statements to proceed.
+          </div>
+        </div>
+      </div><!-- /.video-grid -->
+
+      <!-- Overall readiness summary -->
+      <div id="readiness-bar" class="readiness-bar" aria-live="polite">
+        <span id="readiness-text">0 / {{ letters|length }} videos ready</span>
+      </div>
+
+      <div class="submit-wrapper">
+        <button type="submit" id="submit-btn"
+                class="btn btn-primary btn-lg submit-btn">
+          Submit
+        </button>
+        <p id="form-message" class="form-message" aria-live="assertive"></p>
+      </div>
+    </form>
+
+    <!-- Loading overlay shown while POST is in flight -->
+    <div id="loading-overlay" style="display:none">
+      <div class="loading-content">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p id="loading-message">Submitting keypoints…</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="survey-footer">
+    <p>Questions? Contact me at sc23os@leeds.ac.uk</p>
+    <p class="small-text">This survey is part of a university research project.</p>
+  </footer>
+
+</div><!-- /.container -->
+
+<!-- Bootstrap JS (unchanged) -->
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.6/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/js/bootstrap.min.js"></script>
+
+<!--
+  Pass the sign list from Flask to JS as a JSON array.
+  Jinja's tojson filter handles escaping safely.
+-->
+<script>
+  window.BSL_LETTERS = {{ letters | tojson }};
+  window.CLOUDFLARE_WORKER_URL = "https://your-worker.workers.dev/submit";
+</script>
+
+<!-- The survey integration script — see survey-integration.js below -->
+<script type="module" src="{{ url_for('static', filename='js/survey-integration.js') }}"></script>
+
+</body>
+</html>
