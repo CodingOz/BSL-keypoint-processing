@@ -51,7 +51,6 @@ class Sigh_lenths:
     
 class KeyPointValidator:
     def __init__(self, filepath):
-        # loads json file
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 self.data = json.load(f)

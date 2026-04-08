@@ -1,3 +1,5 @@
+import os
+
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from anomaly_detection import AnomalyDetection
 import json
@@ -9,6 +11,14 @@ class DataCleaner:
     '''
     def __init__(self, path):
         self.path = path
+        
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                self.data = json.load(f)
+        except Exception as e:
+            print(f"Failed to read/parse JSON file '{path}': {e}")
+            return 1
+        self.frames = self.data.get('frames', [])
         self.validator = CubicSplineKeyPointInterpolator(path)
         self.anomaly_detector = AnomalyDetection(self.validator)
 
@@ -42,8 +52,6 @@ class DataCleaner:
             return anomaly_frames_left, anomaly_frames_right
         
         else:
-            # anomalous frames stored in left and right frame anomaly lists in metadata
-            # for later insertion validator use
             for frame in anomaly_frames_left:
                 self.current['metadata'].setdefault('left_anomalous_frames', []).append(self.current['frames'][frame])
                 # remove anomalous hand keypoints from main dataset
@@ -59,14 +67,11 @@ class DataCleaner:
             self.versions.append(copy.deepcopy(self.current))
         
             
-        # resets validator and anomaly detector with updated data
         with open(self.path, 'w', encoding='utf-8') as f:
             json.dump(self.current, f, indent=2)
         self.validator = CubicSplineKeyPointInterpolator(self.path)
         self.anomaly_detector = AnomalyDetection(self.validator)
         
-        # reruns detection until no anomalous frames are found
-        # counts down recursive level to prevent infinite loops
         if recursive_level > 0:
             recursive_level -= 1
             
@@ -83,7 +88,80 @@ class DataCleaner:
         '''returns all metadata from the current data'''
         return self.current.get('metadata', {})
 
-#path = r"C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\acf7a090-7ece-488a-a6e8-f4df878629a9.json"
+    def detectDoubleHandAnomalousFrames(self, show_logs=False):
+        """saves all Simultaneous hand anomalys
+        removes and saves them to simultaneous_hands_frames in metadata """
+        
+        # insure json is up to date
+        try:
+            with open(self.path, 'r', encoding='utf-8') as f:
+                self.data = json.load(f)
+        except Exception as e:
+            print(f"Failed to read/parse JSON file '{self.path}': {e}")
+            return 1
+        self.frames = self.data.get('frames', [])
+        
+        cases = self.validator.checkForSimultaneousHands(show_logs=show_logs)
 
-#cleaner = DataCleaner(path)
+        for case in cases:
+            frame_index, side = case
+            
+            frame = copy.deepcopy(self.frames[frame_index])
+            self.data['frames'][frame_index]['hands'][side] = []
+            self.data['metadata'].setdefault('simultaneous_hands_frames', []).append(frame)
+        with open(self.path, 'w', encoding='utf-8') as f:
+            json.dump(self.data, f, indent=2)
 
+    def undoDetectDoubleHandAnomalousFrames(self, show_logs=False):
+        """reverces the proccess of detectDoubleHandAnomalousFrames by reinserting the anomalous frames back into the main dataset and removing them from metadata
+        
+        this helps to valiate that all changes are trachible and reversible and that no data is lost in the cleaning process
+        """
+        # insure json is up to date
+        try:
+            with open(self.path, 'r', encoding='utf-8') as f:
+                self.data = json.load(f)
+        except Exception as e:
+            print(f"Failed to read/parse JSON file '{self.path}': {e}")
+            return 1
+        
+        # Get saved simultaneous hands frames from metadata
+        simultaneous_frames = self.data['metadata'].get('simultaneous_hands_frames', [])
+        
+        if not simultaneous_frames:
+            if show_logs:
+                print("No simultaneous hands frames found in metadata to restore")
+            return 0
+        
+        restored_count = 0
+        
+        # Restore each saved frame back to the main dataset
+        for saved_frame in simultaneous_frames:
+            frame_index = None
+            if 'frame_id' in saved_frame:
+                for idx, frame in enumerate(self.data['frames']):
+                    if frame.get('frame_id') == saved_frame['frame_id']:
+                        frame_index = idx
+                        break
+            
+            # If not found, try by frame_index metadata
+            if frame_index is None and 'frame_index' in saved_frame:
+                frame_index = saved_frame['frame_index']
+            
+            # Restore the hands data
+            if frame_index is not None and frame_index < len(self.data['frames']):
+                if 'hands' in saved_frame:
+                    self.data['frames'][frame_index]['hands'] = saved_frame['hands']
+                    restored_count += 1
+        
+        if 'simultaneous_hands_frames' in self.data['metadata']:
+            del self.data['metadata']['simultaneous_hands_frames']
+        
+        with open(self.path, 'w', encoding='utf-8') as f:
+            json.dump(self.data, f, indent=2)
+        
+        if show_logs:
+            print(f"Restored {restored_count} frames with simultaneous hand anomalies")
+        return 0
+        
+            
