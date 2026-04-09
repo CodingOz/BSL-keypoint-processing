@@ -16,8 +16,24 @@ from Keypoint_loader.Data_model import DataModel
 from Keypoint_loader.Playback import PlaybackController
 from Keypoint_loader.Graph_view import GraphView
  
+ 
+def discover_files(root_dir):
+    """Return a list of (letter, filepath) tuples sorted by letter then name."""
+    files = []
+    if not os.path.isdir(root_dir):
+        return files
+    for letter in sorted(os.listdir(root_dir)):
+        letter_dir = os.path.join(root_dir, letter)
+        if not os.path.isdir(letter_dir):
+            continue
+        for fname in sorted(os.listdir(letter_dir)):
+            if fname.endswith(".json"):
+                files.append((letter, os.path.join(letter_dir, fname)))
+    return files
+
+
 class HandDominanceNormaliser:
-    def swapToRightDominant(self, filepath, show_logs):
+    def swapToRightDominant(self, filepath, show_logs=False):
         with open(filepath, "r") as f:
             data = json.load(f)
 
@@ -36,20 +52,30 @@ class HandDominanceNormaliser:
 
         if show_logs:
             print(f"[swapToRightDominant] {filepath} — swapped in place, swapped_dominance=True")
-            
-def discover_files(root_dir):
-    """Return a list of (letter, filepath) tuples sorted by letter then name."""
-    files = []
-    if not os.path.isdir(root_dir):
-        return files
-    for letter in sorted(os.listdir(root_dir)):
-        letter_dir = os.path.join(root_dir, letter)
-        if not os.path.isdir(letter_dir):
-            continue
-        for fname in sorted(os.listdir(letter_dir)):
-            if fname.endswith(".json"):
-                files.append((letter, os.path.join(letter_dir, fname)))
-    return files
+    
+    def matchSwappedCorpus(self, preswapped_corpus, target_corpus, show_logs=False):
+        '''the the source vidoes of V1 and V2 file are identical we can assume the hand forminance if too
+        thus if one copus have been manualy labled the the other one can mimic its operations without
+        the need for more manual labling
+        
+        takes
+            preswapped_corpus: already labled and swapped corpus
+            target_corpus: corpus to be labled and swapped based on preswapped_corpus
+        '''
+        
+        preswapped_items = discover_files(preswapped_corpus)
+        target_items = discover_files(target_corpus)
+        
+        if len(preswapped_items) != len(target_items):
+            print("error: two copuses must have equivilent structure")
+        
+        for index, preswapped_item, in enumerate(preswapped_items):
+            target_item = target_items[index]
+            with open(preswapped_item[1], "r") as f:
+                preswapped_data = json.load(f)
+            if preswapped_data['metadata'].get("swapped_dominance") == True:
+                self.swapToRightDominant(target_item[1], show_logs=show_logs)
+                
 
 def file_already_labelled(filepath):
     """Check whether a file already has a dominance label in its metadata."""
@@ -405,7 +431,13 @@ class DominanceLabellingWindow(QMainWindow):
                 
 if __name__ == "__main__":
     root_dir = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Unproccessed_keypoints_V1"
+    
+    target = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Unproccessed_keypoints_V2"
+    
+    dom_hander = HandDominanceNormaliser()
+    dom_hander.matchSwappedCorpus(root_dir, target, show_logs=True)
+    '''
     app = QApplication(sys.argv)
     window = DominanceLabellingWindow(root_dir=root_dir)
     window.show()
-    sys.exit(app.exec())
+    sys.exit(app.exec())'''
