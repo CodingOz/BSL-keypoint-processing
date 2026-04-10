@@ -547,7 +547,6 @@ class KeyPointValidator:
         return distances, midpoint
 
     def flagAbnormalDistances(self, outlier_boundry=-0.1):
-        '''Uses relitive to'''
         distances, midpoint = self.findAllHandDistancesFromAdaptiveMidpoint()
         left_flags = []
         right_flags = []
@@ -922,6 +921,104 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
 
         
         return left_boundrys, right_boundrys
+    
+    def findMovementRelativeByMAD(self, threshold):
+        """ instead of hard thresholding for the movement, constructs a Gaussian distribution 
+        for each the files momentum, then basing the threshold on a set amount of 
+        MADs above the median
+        
+        takes:
+            threshold: float of the standard deviations above the mean for outliers
+        
+        returns:
+            2 lists holding indexes that have spiked
+        """
+        momentums = self.getEstimatedMomentums()
+        left_boundrys = []
+        right_boundrys = []
+
+        left_magnitudes = np.array([m['left']['magnitude'] for m in momentums])
+        right_magnitudes = np.array([m['right']['magnitude'] for m in momentums])
+        
+        # strip out 0 values to get a more accurate picture of the movement distribution
+        stripped_left_magnitudes = left_magnitudes[left_magnitudes > 0]
+        stripped_right_magnitudes = right_magnitudes[right_magnitudes > 0]
+        
+        # Robust location and scale estimators
+        left_median = np.median(stripped_left_magnitudes)
+        left_mad = np.median(np.abs(stripped_left_magnitudes - left_median)) * 1.4826
+        
+        right_median = np.median(stripped_right_magnitudes)
+        right_mad = np.median(np.abs(stripped_right_magnitudes - right_median)) * 1.4826
+
+        left_threshold = left_median + threshold * left_mad
+        right_threshold = right_median + threshold * right_mad
+
+        for i in range(len(momentums) - 1):
+            if momentums[i]['left']['magnitude'] > left_threshold:
+                left_boundrys.append(i)
+                left_boundrys.append(i + 1)
+
+            if momentums[i]['right']['magnitude'] > right_threshold:
+                right_boundrys.append(i)
+                right_boundrys.append(i + 1)
+
+        return left_boundrys, right_boundrys
+        
+    def findMovementRelativeByPercentile(self, percentile):
+        ''' instead of hard thresholding for the movement, constructs a Gaussian distribution
+        for each the files momentum, then basing the threshold on a set amount of
+        percentiles above the mean'''
+        momentums = self.getEstimatedMomentums()
+        left_boundrys = []
+        right_boundrys = []
+        
+        left_magnitudes = np.array([m['left']['magnitude'] for m in momentums])
+        right_magnitudes = np.array([m['right']['magnitude'] for m in momentums])
+        
+        left_threshold = np.percentile(left_magnitudes, percentile)
+        right_threshold = np.percentile(right_magnitudes, percentile)
+        
+        for i in range(len(momentums) - 1):
+            if momentums[i]['left']['magnitude'] > left_threshold:
+                left_boundrys.append(i)
+                left_boundrys.append(i + 1)
+
+            if momentums[i]['right']['magnitude'] > right_threshold:
+                right_boundrys.append(i)
+                right_boundrys.append(i + 1)
+                
+        return left_boundrys, right_boundrys
+    
+    def findMovementRelativeByStdDev(self, num_std_dev):
+        ''' instead of hard thresholding for the movement, constructs a Gaussian distribution
+        for each the files momentum, then basing the threshold on a set amount of
+        standard deviations above the mean'''
+        momentums = self.getEstimatedMomentums()
+        left_boundrys = []
+        right_boundrys = []
+
+        left_magnitudes = np.array([m['left']['magnitude'] for m in momentums])
+        right_magnitudes = np.array([m['right']['magnitude'] for m in momentums])
+
+        left_mean = np.mean(left_magnitudes)
+        left_std = np.std(left_magnitudes)
+        left_threshold = left_mean + num_std_dev * left_std
+
+        right_mean = np.mean(right_magnitudes)
+        right_std = np.std(right_magnitudes)
+        right_threshold = right_mean + num_std_dev * right_std
+
+        for i in range(len(momentums) - 1):
+            if momentums[i]['left']['magnitude'] > left_threshold:
+                left_boundrys.append(i)
+                left_boundrys.append(i + 1)
+
+            if momentums[i]['right']['magnitude'] > right_threshold:
+                right_boundrys.append(i)
+                right_boundrys.append(i + 1)
+
+        return left_boundrys, right_boundrys
         
     def interpolateFullHands(self, start_frame=0, end_frame=None, show_logs=False):
         keypoint_data = self.getKeyPointsAsLists()
@@ -966,7 +1063,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         return filled_keypoints, estimation_flags
 
     def detectRestPositionFrames(self,
-                                y_threshold_relative=0.15,  # rest is this far below signing space bottom
+                                y_threshold_relative=0.15,
                                 proximity_threshold=0.15,
                                 min_run_length=3):
         """
@@ -1222,6 +1319,10 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         }
 
 if __name__ == "__main__":
+    
+    
+    
+    
     a = r'''
     from pathlib import Path
     from tabulate import tabulate

@@ -124,11 +124,41 @@ class RunDetectionTests:
 
         'filled_movement': lambda det, **p: det.filledMovementAnomalys(**p),
 
+
+        # --- relative movement variants ---
+        'filled_relative_mad': lambda det, **p: (
+            det.filledMovementAnomalysByMAD(**p)
+        ),
+
+        'filled_relative_percentile': lambda det, **p: (
+            det.filledMovementAnomalysByPercentile(**p)
+        ),
+
+        'filled_relative_stddev': lambda det, **p: (
+            det.filledMovementAnomalysByStdDev(**p)
+        ),
+        
         'position_and_filled_movement': lambda det, **p: (
             det.posisionAndFilledMovmentAnomalys(**p)
         ),
+        
+        'position_and_filled_movement_by_stddev': lambda det, **p: (
+            det.posisionAndFilledMovmentAnomalysByStdDev(**p)
+        ),
+        
+        'position_and_filled_movement_by_mad': lambda det, **p: (
+            det.posisionAndFilledMovmentAnomalysByMAD(**p)
+        ),
+        
+        'position_and_filled_movement_by_percentile': lambda det, **p: (
+            det.posisionAndFilledMovmentAnomalysByPercentile(**p)
+        ),
+        
+        'position_and_stddev_intersection': lambda det, **p: (
+            det.posisionAndFilledMovmentByStdDevIntersection(**p)
+        )
     }
-
+    
     # Default parameter grids — each is a list of kwarg dicts to trial
     DEFAULT_PARAM_GRIDS: dict[str, list[dict]] = {
         'movement_only': [
@@ -148,7 +178,58 @@ class RunDetectionTests:
             for pt in [-0.10, -0.15]
             for g in [3, 5]
         ],
-    }
+        # --- relative movement variants ---
+        'filled_relative_mad': [
+            {'threshold': t, 'gap_size': g}
+            for t in [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+            for g in [3, 5, 8]
+        ],
+        'filled_relative_percentile': [
+            {'percentile': p, 'gap_size': g}
+            for p in [85, 90, 93, 95, 97, 99]
+            for g in [3, 5, 8]
+        ],
+        'filled_relative_stddev': [
+            {'num_std_dev': s, 'gap_size': g}
+            for s in [1.0, 1.5, 2.0, 2.5, 3.0]
+            for g in [3, 5, 8]
+        ],
+        
+        'position_and_filled_movement_by_stddev': [
+            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g
+                , 'num_std_dev': s}
+            for mt in [0.10, 0.15, 0.20]
+            for pt in [-0.10, -0.15]
+            for g in [3, 5]
+            for s in [1.0, 1.5, 2.0, 2.5, 3.0]
+        ],
+        
+        'position_and_filled_movement_by_mad': [
+            
+            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g
+                , 'threshold': t}
+            for mt in [0.10, 0.15, 0.20]
+            for pt in [-0.10, -0.15]
+            for g in [3, 5]
+            for t in [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+        ],
+
+
+        'position_and_filled_movement_by_percentile': [ 
+            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g
+                , 'percentile': p}
+            for mt in [0.10, 0.15, 0.20]
+            for pt in [-0.10, -0.15]
+            for g in [3, 5]
+            for p in [85, 90, 93, 95, 97, 99]
+        ],
+        
+        'position_and_stddev_intersection': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g}
+            for s in [1.5, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.5]
+            for pt in [-0.05, -0.10, -0.15]
+            for g in [3, 5]
+        ]}
 
     def __init__(self, corpus_path: str, param_grids: dict[str, list[dict]] | None = None, show_logs=False):
         """
@@ -345,14 +426,23 @@ class RunDetectionTests:
 
         print(f"\nBest params per method (metric={metric}, side={side}):")
         for method, (params, score) in best.items():
-            print(f"  {method:<35} {params}  →  {metric}={score:.4f}")
+            print(f"  {method:<35} {params}:  {metric}={score:.4f}")
 
         return best
     
     @staticmethod
     def performance_by_swap_size(
         summaries: dict[str, 'MethodSummary'],
-        methods:   list[str] = ('position_only', 'filled_movement', 'position_and_filled_movement'),
+        methods:   list[str] = ('position_only', 
+                                'filled_movement', 
+                                'position_and_filled_movement', 
+                                'filled_relative_mad', 
+                                'filled_relative_percentile', 
+                                'filled_relative_stddev',
+                                'position_and_filled_movement_by_stddev',
+                                'position_and_filled_movement_by_mad',
+                                'position_and_filled_movement_by_percentile',
+                                'position_and_stddev_intersection'),
         metric:    str = 'f1',
         side:      str = 'combined',
     ):
@@ -560,14 +650,23 @@ if __name__ == "__main__":
     )
 
     # run all methods with default param grids
-    summaries, found = run_recursive_data_cleaning(
-        recursive_range=(0, 1, 2, 3, 4, 5))
+    summaries = runner.run(verbose=False)
     
-    print(summaries)
+    
+    #runner.print_summary(summaries)
+    runner.best_params(summaries, metric='f1', side='combined')
+    
+    runner.performance_by_swap_size(summaries, metric='f1', side='combined')
+    
+    runner.best_params(summaries, metric='recall', side='combined')
+    
+    runner.performance_by_swap_size(summaries, metric='recall', side='combined')
+    
+    # print(summaries)
     
     # saves sumaries 
-    with open(r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\recursive_cleaning_summaries.json", 'w', encoding='utf-8') as f:
-        json.dump([dataclasses.asdict(s) for s in summaries], f, indent=2)
+    # with open(r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\recursive_cleaning_summaries.json", 'w', encoding='utf-8') as f:
+    #    json.dump([dataclasses.asdict(s) for s in summaries], f, indent=2)
 
     '''
     print("Gaussian placement corpus:")
