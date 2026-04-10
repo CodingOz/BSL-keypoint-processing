@@ -123,6 +123,30 @@ class RunDetectionTests:
         'position_only': lambda det, **p: det.posisionAnomalys(**p),
 
         'filled_movement': lambda det, **p: det.filledMovementAnomalys(**p),
+        
+        'ordering_palm_center_neighbour': lambda det, **p: (
+            det.handOrderingAnomalysByPalmCenterUsingNeighbourFilling(**p)
+        ),
+ 
+        'ordering_wrist_neighbour': lambda det, **p: (
+            det.handOrderingAnomalysByWristUsingNeighbourFilling(**p)
+        ),
+ 
+        'ordering_extremes_neighbour': lambda det, **p: (
+            det.handOrderingAnomalysByExtremesUsingNeighbourFilling(**p)
+        ),
+        
+        'ordering_palm_center_interpolation': lambda det, **p: (
+            det.handOrderingAnomalysByPalmCenterUsingInterpolation(**p)
+        ),
+ 
+        'ordering_wrist_interpolation': lambda det, **p: (
+            det.handOrderingAnomalysByWristUsingInterpolation(**p)
+        ),
+ 
+        'ordering_extremes_interpolation': lambda det, **p: (
+            det.handOrderingAnomalysByExtremesUsingInterpolation(**p)
+        ),
 
 
         # --- relative movement variants ---
@@ -156,80 +180,232 @@ class RunDetectionTests:
         
         'position_and_stddev_intersection': lambda det, **p: (
             det.posisionAndFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_palm_center_neighbour_stddev_intersection': lambda det, **p: (
+            det.OrderingByPalmsWithNeighbourFillingAndFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_wrist_neighbour_stddev_intersection': lambda det, **p: (
+            det.OrderingByWristsWithNeighbourFillingAndFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_extremes_neighbour_stddev_intersection': lambda det, **p: (
+            det.OrderingByExtremesWithNeighbourFillingAndFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_palm_center_interpolation_stddev_intersection': lambda det, **p: (
+            det.OrderingByPalmsWithInterpolationAndFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_wrist_interpolation_stddev_intersection': lambda det, **p: (
+            det.OrderingByWristsWithInterpolationAndFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_extremes_interpolation_stddev_intersection': lambda det, **p: (
+            det.OrderingByExtremesWithInterpolationAndFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_palm_center_neighbour_stddev_union': lambda det, **p: (
+            det.OrderingByPalmsWithNeighbourFillingOrFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_wrist_neighbour_stddev_union': lambda det, **p: (
+            det.OrderingByWristsWithNeighbourFillingOrFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_extremes_neighbour_stddev_union': lambda det, **p: (
+            det.OrderingByExtremesWithNeighbourFillingOrFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_palm_center_interpolation_stddev_union': lambda det, **p: (
+            det.OrderingByPalmsWithInterpolationOrFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_wrist_interpolation_stddev_union': lambda det, **p: (
+            det.OrderingByWristsWithInterpolationOrFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'ordering_extremes_interpolation_stddev_union': lambda det, **p: (
+            det.OrderingByExtremesWithInterpolationOrFilledMovmentByStdDevIntersection(**p)
         )
     }
     
     # Default parameter grids — each is a list of kwarg dicts to trial
     DEFAULT_PARAM_GRIDS: dict[str, list[dict]] = {
         'movement_only': [
-            {'threshold': t} for t in [0.05, 0.10, 0.15, 0.20, 0.30]
+            {'threshold': t} for t in [0.10, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.20]
         ],
         'position_only': [
-            {'threshold': t} for t in [-0.05, -0.10, -0.15, -0.20, -0.30]
+            {'threshold': t} for t in [-0.02, -0.03, -0.04, -0.05, -0.06, -0.07, -0.08, -0.10]
         ],
         'filled_movement': [
             {'threshold': t, 'gap_size': g}
-            for t in [0.10, 0.15, 0.20]
-            for g in [3, 5, 8]
+            for t in [0.08, 0.09, 0.10, 0.11, 0.12, 0.13, 0.15]
+            for g in [4, 5, 6]
         ],
         'position_and_filled_movement': [
             {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g}
-            for mt in [0.10, 0.15, 0.20]
-            for pt in [-0.10, -0.15]
-            for g in [3, 5]
+            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
         ],
         # --- relative movement variants ---
         'filled_relative_mad': [
             {'threshold': t, 'gap_size': g}
-            for t in [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
-            for g in [3, 5, 8]
+            for t in [4.5, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.5]
+            for g in [4, 5, 6]
         ],
         'filled_relative_percentile': [
             {'percentile': p, 'gap_size': g}
-            for p in [85, 90, 93, 95, 97, 99]
-            for g in [3, 5, 8]
+            for p in [94, 95, 96, 97, 98, 99]
+            for g in [4, 5, 6]
         ],
         'filled_relative_stddev': [
             {'num_std_dev': s, 'gap_size': g}
-            for s in [1.0, 1.5, 2.0, 2.5, 3.0]
-            for g in [3, 5, 8]
+            for s in [1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+            for g in [4, 5, 6]
         ],
         
         'position_and_filled_movement_by_stddev': [
-            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g
-                , 'num_std_dev': s}
-            for mt in [0.10, 0.15, 0.20]
-            for pt in [-0.10, -0.15]
-            for g in [3, 5]
-            for s in [1.0, 1.5, 2.0, 2.5, 3.0]
+            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g, 'num_std_dev': s}
+            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for s in [1.8, 1.9, 2.0, 2.1, 2.2]
         ],
         
         'position_and_filled_movement_by_mad': [
-            
-            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g
-                , 'threshold': t}
-            for mt in [0.10, 0.15, 0.20]
-            for pt in [-0.10, -0.15]
-            for g in [3, 5]
-            for t in [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g, 'threshold': t}
+            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for t in [4.5, 4.7, 4.9, 5.0, 5.1, 5.3, 5.5]
         ],
 
-
         'position_and_filled_movement_by_percentile': [ 
-            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g
-                , 'percentile': p}
-            for mt in [0.10, 0.15, 0.20]
-            for pt in [-0.10, -0.15]
-            for g in [3, 5]
-            for p in [85, 90, 93, 95, 97, 99]
+            {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g, 'percentile': p}
+            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [4, 5, 6]
+            for p in [94, 95, 96, 97, 98, 99]
         ],
         
         'position_and_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g}
-            for s in [1.5, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.5]
-            for pt in [-0.05, -0.10, -0.15]
-            for g in [3, 5]
-        ]}
+            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
+            for pt in [-0.03, -0.04, -0.05, -0.06, -0.07]
+            for g in [4, 5, 6]
+        ],
+        'ordering_palm_center_neighbour': [
+            {'margin': m}
+            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+        ],
+        'ordering_wrist_neighbour': [
+            {'margin': m}
+            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+        ],
+        'ordering_extremes_neighbour': [
+            {'margin': m}
+            for m in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+        ],
+        'ordering_palm_center_interpolation': [
+            {'margin': m}
+            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+        ],
+        'ordering_wrist_interpolation': [
+            {'margin': m}
+            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+        ],
+        'ordering_extremes_interpolation': [
+            {'margin': m}
+            for m in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+        ],
+        'ordering_palm_center_neighbour_stddev_intersection': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [4, 5, 6]
+            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+        ],
+        'ordering_wrist_neighbour_stddev_intersection': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [4, 5, 6]
+            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+        ],
+        'ordering_extremes_neighbour_stddev_intersection': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for m in [0.0, 0.005, 0.01, 0.015, 0.02]
+        ],
+        'ordering_palm_center_interpolation_stddev_intersection': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [4, 5, 6]
+            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+        ],
+        'ordering_wrist_interpolation_stddev_intersection': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [4, 5, 6]
+            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+        ],
+        'ordering_extremes_interpolation_stddev_intersection': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for m in [0.0, 0.005, 0.01, 0.015, 0.02]
+        ],
+        'ordering_palm_center_neighbour_stddev_union': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for m in [0.01, 0.02, 0.03, 0.04, 0.05]
+        ],
+        'ordering_wrist_neighbour_stddev_union': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for m in [0.01, 0.02, 0.03, 0.04, 0.05]
+        ],
+        'ordering_extremes_neighbour_stddev_union': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [4, 5, 6]
+            for m in [0.0, 0.01, 0.02, 0.03]
+        ],
+        'ordering_palm_center_interpolation_stddev_union': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for m in [0.0, 0.01, 0.02, 0.03, 0.04]
+        ],
+        'ordering_wrist_interpolation_stddev_union': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [2, 3, 4, 5]
+            for m in [0.01, 0.02, 0.03, 0.04, 0.05]
+        ],
+        'ordering_extremes_interpolation_stddev_union': [
+            {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
+            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
+            for g in [4, 5, 6]
+            for m in [0.0, 0.01, 0.02, 0.03]
+        ],
+    }
 
     def __init__(self, corpus_path: str, param_grids: dict[str, list[dict]] | None = None, show_logs=False):
         """
@@ -312,47 +488,52 @@ class RunDetectionTests:
         )
 
     def run(
-        self,
-        methods: list[str] | None = None,
-        verbose: bool = True,
-    ) -> dict[str, MethodSummary]:
+    self,
+    methods: list[str] | None = None,
+    verbose: bool = True,
+) -> dict[str, MethodSummary]:
         """
         Run all specified methods across all corpus files.
-
-        takes:
-            methods:  list of method names to run (default: all in METHODS)
-            verbose:  print progress
-
-        returns:
-            dict mapping method_name -> MethodSummary
-            (one MethodSummary per (method, param) combination)
+        File loading is the outer loop so each validator is built only once
+        and reused across every method/param combination.
         """
         methods = methods or list(self.METHODS.keys())
-        # key: f"{method_name}::{param_repr}"
         summaries: dict[str, MethodSummary] = {}
 
+        # Pre-create a MethodSummary for every (method, params) key
         for method_name in methods:
             if method_name not in self.METHODS:
                 print(f"Unknown method '{method_name}' — skipping")
                 continue
-
-            detector_fn  = self.METHODS[method_name]
-            param_grid   = self.param_grids.get(method_name, [{}])
-
-            for params in param_grid:
+            for params in self.param_grids.get(method_name, [{}]):
                 key = f"{method_name}::{params}"
-                summary = MethodSummary(method_name=method_name, params=params)
+                summaries[key] = MethodSummary(method_name=method_name, params=params)
 
-                for filepath in self.files:
-                    if verbose:
-                        print(f"  [{method_name}] {os.path.basename(filepath)}  params={params}")
+        # Outer loop: each file is loaded and validated ONCE
+        for file_idx, filepath in enumerate(self.files):
+            if verbose:
+                print(f"[{file_idx + 1}/{len(self.files)}] {os.path.basename(filepath)}")
+
+            try:
+                gt_left, gt_right, total_frames = self._extract_ground_truth(filepath)
+                validator = CubicSplineKeyPointInterpolator(filepath)
+                detector = AnomalyDetection(validator)
+            except Exception as e:
+                print(f"  ERROR loading {filepath}: {e}")
+                continue
+
+            # Inner loop: every method/param combo reuses the same detector
+            for method_name in methods:
+                if method_name not in self.METHODS:
+                    continue
+
+                detector_fn = self.METHODS[method_name]
+                param_grid = self.param_grids.get(method_name, [{}])
+
+                for params in param_grid:
+                    key = f"{method_name}::{params}"
 
                     try:
-                        gt_left, gt_right, total_frames = self._extract_ground_truth(filepath)
-
-                        validator = CubicSplineKeyPointInterpolator(filepath)
-                        detector  = AnomalyDetection(validator)
-
                         detected_left, detected_right = detector_fn(detector, **params)
 
                         file_result = FileResult(
@@ -369,16 +550,14 @@ class RunDetectionTests:
                             metrics_right=self._compute_metrics(
                                 detected_right, gt_right, total_frames),
                         )
-                        summary.per_file.append(file_result)
+                        summaries[key].per_file.append(file_result)
 
                     except Exception as e:
-                        print(f"    ERROR on {filepath}: {e}")
+                        print(f"    ERROR [{method_name}] {params}: {e}")
 
-                summaries[key] = summary
-
-        return summaries
-
-    # reporting
+        return summaries# reporting
+    
+    
     @staticmethod
     def print_summary(summaries: dict[str, 'MethodSummary']):
         """Pretty-print aggregated results for every method/param combination."""
@@ -442,7 +621,9 @@ class RunDetectionTests:
                                 'position_and_filled_movement_by_stddev',
                                 'position_and_filled_movement_by_mad',
                                 'position_and_filled_movement_by_percentile',
-                                'position_and_stddev_intersection'),
+                                'position_and_stddev_intersection''ordering_palm_center',
+                                'ordering_wrist',
+                                'ordering_extremes'),
         metric:    str = 'f1',
         side:      str = 'combined',
     ):
@@ -651,9 +832,6 @@ if __name__ == "__main__":
 
     # run all methods with default param grids
     summaries = runner.run(verbose=False)
-    
-    
-    #runner.print_summary(summaries)
     runner.best_params(summaries, metric='f1', side='combined')
     
     runner.performance_by_swap_size(summaries, metric='f1', side='combined')
@@ -661,6 +839,13 @@ if __name__ == "__main__":
     runner.best_params(summaries, metric='recall', side='combined')
     
     runner.performance_by_swap_size(summaries, metric='recall', side='combined')
+    
+    
+    with open(r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Error_detection_summaries.json", 'w', encoding='utf-8') as f:
+        json.dump([dataclasses.asdict(s) for s in summaries.values()], f, indent=2)
+    
+    
+    #runner.print_summary(summaries)
     
     # print(summaries)
     

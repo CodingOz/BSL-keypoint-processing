@@ -1318,138 +1318,400 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
             'combined': combined,
         }
 
-if __name__ == "__main__":
-    
-    
-    
-    
-    a = r'''
-    from pathlib import Path
-    from tabulate import tabulate
-    
-    # Define the corpus path
-    corpus_path = Path(r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus')
-    
-    # Collect results
-    results = []
-    errors = []
-    
-    # Process each JSON file in the corpus
-    json_files = sorted(corpus_path.glob('*.json'))
-    
-    print(f"\nProcessing {len(json_files)} sign files from Validated_interpolated_SubCorpus...")
-    print("=" * 80)
-    
-    for json_file in json_files:
-        sign_name = json_file.stem  # filename without .json extension
-        
-        try:
-            # Instantiate interpolator and detect rest position frames
-            interpolator = CubicSplineKeyPointInterpolator(str(json_file))
-            first_stroke, last_stroke = interpolator.detectRestPositionFrames()
-            
-            # Calculate stroke duration
-            stroke_duration = last_stroke - first_stroke + 1
-            
-            results.append({
-                'Sign': sign_name,
-                'First Stroke': first_stroke,
-                'Last Stroke': last_stroke,
-                'Duration': stroke_duration
-            })
-            
-        except Exception as e:
-            errors.append({
-                'Sign': sign_name,
-                'Error': str(e)
-            })
-            print(f"[ERROR] {sign_name}: {str(e)}")
-    
-    # Display results in table format
-    print("\n" + "=" * 80)
-    print("STROKE POSITION DETECTION RESULTS")
-    print("=" * 80)
-    if results:
-        try:
-            print(tabulate(results, headers='keys', tablefmt='grid', showindex=True))
-        except ImportError:
-            # Fallback if tabulate is not available
-            print("\n{:<40} {:<15} {:<15} {:<10}".format('Sign', 'First Stroke', 'Last Stroke', 'Duration'))
-            print("-" * 80)
-            for row in results:
-                print("{:<40} {:<15} {:<15} {:<10}".format(
-                    row['Sign'], row['First Stroke'], row['Last Stroke'], row['Duration']
-                ))
-    
-    # Display summary statistics
-    if results:
-        print("\n" + "=" * 80)
-        print("SUMMARY STATISTICS")
-        print("=" * 80)
-        durations = [r['Duration'] for r in results]
-        print(f"Total signs processed: {len(results)}")
-        print(f"Average stroke duration: {sum(durations) / len(durations):.1f} frames")
-        print(f"Min stroke duration: {min(durations)} frames")
-        print(f"Max stroke duration: {max(durations)} frames")
-    
-    # Display errors if any
-    if errors:
-        print("\n" + "=" * 80)
-        print("PROCESSING ERRORS")
-        print("=" * 80)
-        for error in errors:
-            print(f"  • {error['Sign']}: {error['Error']}")
-    
-    print("=" * 80 + "\n")
-        
-    
-    
-    a = 
-    path = r'C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\3e9dd7e5-f6a3-4b1f-9f29-9fba66f0b73c.json'
-    path = r"C:\Users\Oscar Strong\Desktop\finalProgect\KeypointCorpus_unprocessed\B\acf7a090-7ece-488a-a6e8-f4df878629a9.json"
-    path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified - recursive level 1\1be98b34-0edc-41ee-871c-e592c0b4198f.json"
-    validator = CubicSplineKeyPointInterpolator(path)
-    
-    print()
-    
-    left_missing, right_missing = validator.findNonMissingValueClusters()
-    left_fast, right_fast = validator.findMovmentClusters()
-    
-    #print('visible values\n', left_missing, '\n\n', 'movment\n', left_fast)
-    
-    
-    print(validator.estimateMissingMomentums(), "\n\n")
-    
-    print(validator.findMovmentClusters(max_momentum=0.1))
-    
-    
-    
-    
-    frame = 66
-    
-    print("palm centers:")
-    print(validator.findAllPalmCenters())
-    
-    print("\nmomentums:")
-    print(validator.getMomentums())
 
-    print("\naccelerations:")
-    print(validator.getAccelerations())  # Use frame-1 since accelerations are one frame behind momentums
+    @staticmethod
+    def _nearestFill(sequence):
+        """Fills missing values with the temporally closest known value.
+        
+        No interpolation — each missing entry gets a copy of whichever 
+        known entry is nearest in time. If equidistant, uses the earlier one.
+        
+        Example: [m, m, a, b, m, m, m, c, m, m, d, m]
+              -> [a, a, a, b, b, b, c, c, c, d, d, d]
+        
+        takes:
+            sequence: list where known entries are [x, y] and missing 
+                      entries are None or [None, None]
+        returns:
+            list of same length with all missing entries filled
+        """
+        n = len(sequence)
+        filled = [None] * n
+        
+        # Find indices of known values
+        known = []
+        for i, val in enumerate(sequence):
+            if val is not None and val != [None, None] and None not in val:
+                known.append(i)
+                filled[i] = val
+        
+        if not known:
+            return sequence  # nothing to fill with
+        
+        # For each missing position, find the nearest known index
+        # Use two-pointer approach: track the closest known on each side
+        ki = 0  # pointer into known[]
+        for i in range(n):
+            if filled[i] is not None:
+                # advance pointer to stay at or just past i
+                while ki < len(known) - 1 and known[ki] < i:
+                    ki += 1
+                continue
+            
+            # Find closest known index
+            # Check the known index at and around ki
+            best_idx = known[0]
+            best_dist = abs(i - known[0])
+            
+            for k in known:
+                dist = abs(i - k)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_idx = k
+                elif dist > best_dist and k > i:
+                    break  # known is sorted, won't get closer
+            
+            filled[i] = sequence[best_idx]
+        
+        return filled
+ 
+    def findHandOrderingByPalmCenterUsingNeighbourFilling(self, margin=0.0, show_logs=False):
+        """Flags frames where the left palm center X > right palm center X.
+        
+        Compares the averaged palm landmark positions (landmarks 0,1,2,5,9,13,17).
+        Missing hands are filled with their nearest known palm center position.
+        
+        takes:
+            margin: minimum x-distance required to count as a violation.
+                    0.0 = any crossing counts.
+        returns:
+            list of frame indices where left palm center X > right palm center X + margin
+        """
+        if self._KeyPointValidator__palms is None:
+            self.findAllPalmCenters()
+        
+        raw_palms = self._KeyPointValidator__palms
+        
+        # Extract and nearest-fill each side independently
+        left_positions = [p.get('left', [None, None]) for p in raw_palms]
+        right_positions = [p.get('right', [None, None]) for p in raw_palms]
+        
+        filled_left = self._nearestFill(left_positions)
+        filled_right = self._nearestFill(right_positions)
+        
+        violations = []
+        
+        for i in range(len(raw_palms)):
+            left = filled_left[i]
+            right = filled_right[i]
+            
+            # Skip if a hand was never seen at all
+            if (left is None or left == [None, None] or None in left or
+                right is None or right == [None, None] or None in right):
+                continue
+            
+            if left[0] > right[0] + margin:
+                violations.append(i)
+        
+        if show_logs:
+            print(f"findHandOrderingByPalmCenter(margin={margin}): "
+                  f"{len(violations)} violations out of {len(raw_palms)} frames")
+        
+        return violations
+ 
+    def findHandOrderingByWristUsingNeighbourFilling(self, margin=0.0, show_logs=False):
+        """Flags frames where left wrist X > right wrist X.
+        
+        Compares landmark 0 (wrist) only. Missing hands are filled with 
+        their nearest known wrist position.
+        
+        takes:
+            margin: minimum x-distance required to count as a violation
+        returns:
+            list of frame indices where left wrist X > right wrist X + margin
+        """
+        keypoint_data = self.getKeyPointsAsLists()
+        
+        # Extract wrist positions per side
+        left_wrists = []
+        right_wrists = []
+        
+        for frame_kps in keypoint_data:
+            # Left wrist
+            if frame_kps.get('left') and frame_kps['left'][0]:
+                lw = frame_kps['left'][0]
+                if lw != [None, None] and None not in lw:
+                    left_wrists.append(lw)
+                else:
+                    left_wrists.append([None, None])
+            else:
+                left_wrists.append([None, None])
+            
+            # Right wrist
+            if frame_kps.get('right') and frame_kps['right'][0]:
+                rw = frame_kps['right'][0]
+                if rw != [None, None] and None not in rw:
+                    right_wrists.append(rw)
+                else:
+                    right_wrists.append([None, None])
+            else:
+                right_wrists.append([None, None])
+        
+        filled_left = self._nearestFill(left_wrists)
+        filled_right = self._nearestFill(right_wrists)
+        
+        violations = []
+        
+        for i in range(len(keypoint_data)):
+            left = filled_left[i]
+            right = filled_right[i]
+            
+            if (left is None or left == [None, None] or None in left or
+                right is None or right == [None, None] or None in right):
+                continue
+            
+            if left[0] > right[0] + margin:
+                violations.append(i)
+        
+        if show_logs:
+            print(f"findHandOrderingByWrist(margin={margin}): "
+                  f"{len(violations)} violations out of {len(keypoint_data)} frames")
+        
+        return violations
+ 
+    def findHandOrderingByExtremesUsingNeighbourFilling(self, margin=0.0, show_logs=False):
+        """Flags frames where left hand's minimum X > right hand's maximum X.
+        
+        For each frame where a hand is visible, computes min_x (left) or 
+        max_x (right) across all landmarks. Missing frames are filled with 
+        the nearest known computed value.
+        
+        If even left's min-X exceeds right's max-X, the hands are completely 
+        in the wrong order with no overlap.
+        
+        takes:
+            margin: minimum x-distance required to count as a violation
+        returns:
+            list of frame indices where min_x(left) > max_x(right) + margin
+        """
+        keypoint_data = self.getKeyPointsAsLists()
+        
+        # Compute extremes per frame where data exists, None where missing
+        left_min_xs = []
+        right_max_xs = []
+        
+        for frame_kps in keypoint_data:
+            # Left hand: compute min x across all valid landmarks
+            if frame_kps.get('left'):
+                valid_xs = [lm[0] for lm in frame_kps['left'] 
+                           if lm and lm != [None, None] and None not in lm]
+                if valid_xs:
+                    left_min_xs.append([min(valid_xs), 0])  # wrap as [x, y] for _nearestFill
+                else:
+                    left_min_xs.append([None, None])
+            else:
+                left_min_xs.append([None, None])
+            
+            # Right hand: compute max x across all valid landmarks
+            if frame_kps.get('right'):
+                valid_xs = [lm[0] for lm in frame_kps['right'] 
+                           if lm and lm != [None, None] and None not in lm]
+                if valid_xs:
+                    right_max_xs.append([max(valid_xs), 0])
+                else:
+                    right_max_xs.append([None, None])
+            else:
+                right_max_xs.append([None, None])
+        
+        filled_left = self._nearestFill(left_min_xs)
+        filled_right = self._nearestFill(right_max_xs)
+        
+        violations = []
+        
+        for i in range(len(keypoint_data)):
+            left = filled_left[i]
+            right = filled_right[i]
+            
+            if (left is None or left == [None, None] or None in left or
+                right is None or right == [None, None] or None in right):
+                continue
+            
+            if left[0] > right[0] + margin:
+                violations.append(i)
+        
+        if show_logs:
+            print(f"findHandOrderingByExtremes(margin={margin}): "
+                  f"{len(violations)} violations out of {len(keypoint_data)} frames")
+        
+        return violations
     
-    print("\nFilled palm centers with estimation:")
-    estimator = KalmanKeyPointEstimator(path)
-    filled_palms, estimation_flags = estimator.estimateMissingPalmCenters()
-    print(f"Total frames: {filled_palms[frame]}")
     
     
-    estimator = KalmanKeyPointEstimator(path)
-    print("\nFilled palm centers with estimation:")
-    filled_palms, estimation_flags = estimator.estimateMissingPalmCenters(show_logs=False)
-    print(f"Total frames: {len(filled_palms)}")
+    def findHandOrderingByPalmCenterUsingInterpolation(self, margin=0.0, show_logs=False):
+        """Flags frames where the left palm center X > right palm center X.
+        
+        Compares the averaged palm landmark positions (landmarks 0,1,2,5,9,13,17).
+        Missing hands are filled with linear interpolation between known positions.
+        
+        takes:
+            margin: minimum x-distance required to count as a violation
+        returns:
+            list of frame indices where left palm center X > right palm center X + margin
+        """
+        if self._KeyPointValidator__palms is None:
+            self.findAllPalmCenters()
+        
+        raw_palms = self._KeyPointValidator__palms
+        
+        # Extract and interpolate each side independently
+        left_positions = [p.get('left', [None, None]) for p in raw_palms]
+        right_positions = [p.get('right', [None, None]) for p in raw_palms]
+        
+        filled_left, _ = self.interpolateSequence(left_positions)
+        filled_right, _ = self.interpolateSequence(right_positions)
+        
+        violations = []
+        
+        for i in range(len(raw_palms)):
+            left = filled_left[i]
+            right = filled_right[i]
+            
+            # Skip if a hand was never seen at all
+            if (left is None or left == [None, None] or None in left or
+                right is None or right == [None, None] or None in right):
+                continue
+            
+            if left[0] > right[0] + margin:
+                violations.append(i)
+        
+        if show_logs:
+            print(f"findHandOrderingByPalmCenterUsingInterpolation(margin={margin}): "
+                  f"{len(violations)} violations out of {len(raw_palms)} frames")
+        
+        return violations
     
-    print("\nEstimated momentums:")
-    estimated_momentums = estimator.getEstimatedMomentums()
-    print(f"Total momentums: {len(estimated_momentums)}")
-    print("\nEstimated accelerations:")
-    estimated_accelerations = estimator.getEstimatedAccelerations()
-    print(f"Total accelerations: {len(estimated_accelerations)}")'''
+    def findHandOrderingByWristUsingInterpolation(self, margin=0.0, show_logs=False):
+        """Flags frames where left wrist X > right wrist X.
+        
+        Compares landmark 0 (wrist) only. Missing hands are filled with linear 
+        interpolation between known wrist positions.
+        
+        takes:
+            margin: minimum x-distance required to count as a violation
+        returns:
+            list of frame indices where left wrist X > right wrist X + margin
+        """
+        keypoint_data = self.getKeyPointsAsLists()
+        
+        # Extract wrist positions per side
+        left_wrists = []
+        right_wrists = []
+        
+        for frame_kps in keypoint_data:
+            # Left wrist
+            if frame_kps.get('left') and frame_kps['left'][0]:
+                lw = frame_kps['left'][0]
+                if lw != [None, None] and None not in lw:
+                    left_wrists.append(lw)
+                else:
+                    left_wrists.append([None, None])
+            else:
+                left_wrists.append([None, None])
+            
+            # Right wrist
+            if frame_kps.get('right') and frame_kps['right'][0]:
+                rw = frame_kps['right'][0]
+                if rw != [None, None] and None not in rw:
+                    right_wrists.append(rw)
+                else:
+                    right_wrists.append([None, None])
+            else:
+                right_wrists.append([None, None])
+        
+        filled_left, _ = self.interpolateSequence(left_wrists)
+        filled_right, _ = self.interpolateSequence(right_wrists)
+        
+        violations = []
+        
+        for i in range(len(keypoint_data)):
+            left = filled_left[i]
+            right = filled_right[i]
+            
+            if (left is None or left == [None, None] or None in left or
+                right is None or right == [None, None] or None in right):
+                continue
+            
+            if left[0] > right[0] + margin:
+                violations.append(i)
+        
+        if show_logs:
+            print(f"findHandOrderingByWristUsingInterpolation(margin={margin}): "
+                  f"{len(violations)} violations out of {len(keypoint_data)} frames")
+        
+        return violations
+    
+    def findHandOrderingByExtremesUsingInterpolation(self, margin=0.0, show_logs=False):
+        """Flags frames where left hand's minimum X > right hand's maximum X.
+        
+        For each frame where a hand is visible, computes min_x (left) or 
+        max_x (right) across all landmarks. Missing frames are filled with 
+        linear interpolation between known computed values.
+        
+        If even left's min-X exceeds right's max-X, the hands are completely 
+        in the wrong order with no overlap.
+        
+        takes:
+            margin: minimum x-distance required to count as a violation
+        returns:
+            list of frame indices where min_x(left) > max_x(right) + margin
+        """
+        keypoint_data = self.getKeyPointsAsLists()
+        
+        # Compute extremes per frame where data exists, None where missing
+        left_min_xs = []
+        right_max_xs = []
+        
+        for frame_kps in keypoint_data:
+            # Left hand: compute min x across all valid landmarks
+            if frame_kps.get('left'):
+                valid_xs = [lm[0] for lm in frame_kps['left'] 
+                           if lm and lm != [None, None] and None not in lm]
+                if valid_xs:
+                    left_min_xs.append([min(valid_xs), 0])  # wrap as [x, y] for interpolation
+                else:
+                    left_min_xs.append([None, None])
+            else:
+                left_min_xs.append([None, None])
+            
+            # Right hand: compute max x across all valid landmarks
+            if frame_kps.get('right'):
+                valid_xs = [lm[0] for lm in frame_kps['right'] 
+                           if lm and lm != [None, None] and None not in lm]
+                if valid_xs:
+                    right_max_xs.append([max(valid_xs), 0])
+                else:
+                    right_max_xs.append([None, None])
+            else:
+                right_max_xs.append([None, None])
+        
+        filled_left, _ = self.interpolateSequence(left_min_xs)
+        filled_right, _ = self.interpolateSequence(right_max_xs)
+        
+        violations = []
+        
+        for i in range(len(keypoint_data)):
+            left = filled_left[i]
+            right = filled_right[i]
+            
+            if (left is None or left == [None, None] or None in left or
+                right is None or right == [None, None] or None in right):
+                continue
+            
+            if left[0] > right[0] + margin:
+                violations.append(i)
+        
+        if show_logs:
+            print(f"findHandOrderingByExtremesUsingInterpolation(margin={margin}): "
+                  f"{len(violations)} violations out of {len(keypoint_data)} frames")
+        
+        return violations

@@ -251,7 +251,7 @@ class AnomalyDetection():
                         # keep both rather than discarding everything
                         trimmed.extend(run)
                     # single frame run: isolated spike with no gap-fill neighbour
-                    # too ambiguous to include — drop it
+                    # too ambiguous to include then drops it
                     run_start = i + 1
             
             result.append(trimmed)
@@ -288,7 +288,8 @@ class AnomalyDetection():
                                    movement_threshole=0.15,
                                    gap_size=5,
                                    num_std_dev=1.5):
-        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, gap_size=gap_size)
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                       gap_size=gap_size)
         posision = self.posisionAnomalys(threshold=position_threshold)
         
         left =set(movement[0]) | set(posision[0])
@@ -301,7 +302,8 @@ class AnomalyDetection():
                                    movement_threshole=0.15,
                                    threshold=1.0,
                                    gap_size=5):
-        movement = self.filledMovementAnomalysByMAD(threshold=threshold, gap_size=gap_size)
+        movement = self.filledMovementAnomalysByMAD(threshold=threshold, 
+                                                    gap_size=gap_size)
         posision = self.posisionAnomalys(threshold=position_threshold)
         
         left =set(movement[0]) | set(posision[0])
@@ -314,7 +316,8 @@ class AnomalyDetection():
                                       movement_threshole=0.15,
                                       percentile=95,
                                       gap_size=5):
-          movement = self.filledMovementAnomalysByPercentile(percentile=percentile, gap_size=gap_size)
+          movement = self.filledMovementAnomalysByPercentile(percentile=percentile, 
+                                                             gap_size=gap_size)
           posision = self.posisionAnomalys(threshold=position_threshold)
           
           left =set(movement[0]) | set(posision[0])
@@ -333,4 +336,235 @@ class AnomalyDetection():
         left = set(movement[0]) & set(posision[0])
         right = set(movement[1]) & set(posision[1])
         return list(sorted(left)), list(sorted(right))
-                                                     
+    
+    def handOrderingAnomalysByPalmCenterUsingNeighbourFilling(self, 
+                                                              margin=0.0):
+        """Detects hand ordering violations using palm center X comparison
+        with neighbour-filled positions for missing hands.
+        
+        takes:
+            margin: minimum x-distance to count as a violation
+        returns:
+            tuple of (frame_indices, frame_indices) — violations affect both hands equally
+        """
+        violations = self.validator.findHandOrderingByPalmCenterUsingNeighbourFilling(margin=margin)
+        return violations, violations
+
+    def handOrderingAnomalysByWristUsingNeighbourFilling(self, 
+                                                         margin=0.0):
+        """Detects hand ordering violations using wrist X comparison
+        with neighbour-filled positions for missing hands.
+        
+        takes:
+            margin: minimum x-distance to count as a violation
+        returns:
+            tuple of (frame_indices, frame_indices) — violations affect both hands equally
+        """
+        violations = self.validator.findHandOrderingByWristUsingNeighbourFilling(
+            margin=margin)
+        return violations, violations
+
+    def handOrderingAnomalysByExtremesUsingNeighbourFilling(self, 
+                                                            margin=0.0):
+        """Detects hand ordering violations using extreme keypoint X comparison
+        with neighbour-filled positions for missing hands.
+        
+        takes:
+            margin: minimum x-distance to count as a violation
+        returns:
+            tuple of (frame_indices, frame_indices) — violations affect both hands equally
+        """
+        violations = self.validator.findHandOrderingByExtremesUsingNeighbourFilling(
+            margin=margin)
+        return violations, violations
+
+    def handOrderingAnomalysByPalmCenterUsingInterpolation(self, 
+                                                           margin=0.0):
+        """Detects hand ordering violations using palm center X comparison
+        with interpolated positions for missing hands.
+        
+        takes:
+            margin: minimum x-distance to count as a violation
+        returns:
+            tuple of (frame_indices, frame_indices) — violations affect both hands equally
+        """
+        violations = self.validator.findHandOrderingByPalmCenterUsingInterpolation(
+            margin=margin)
+        return violations, violations
+
+    def handOrderingAnomalysByWristUsingInterpolation(self, 
+                                                      margin=0.0):
+        """Detects hand ordering violations using wrist X comparison
+        with interpolated positions for missing hands.
+        
+        takes:
+            margin: minimum x-distance to count as a violation
+        returns:
+            tuple of (frame_indices, frame_indices) — violations affect both hands equally
+        """
+        violations = self.validator.findHandOrderingByWristUsingInterpolation(
+            margin=margin)
+        return violations, violations
+
+    def handOrderingAnomalysByExtremesUsingInterpolation(self, 
+                                                         margin=0.0):
+        """Detects hand ordering violations using extreme keypoint X comparison
+        with interpolated positions for missing hands.
+        
+        takes:
+            margin: minimum x-distance to count as a violation
+        returns:
+            tuple of (frame_indices, frame_indices) — violations affect both hands equally
+        """
+        violations = self.validator.findHandOrderingByExtremesUsingInterpolation(
+            margin=margin)
+        return violations, violations
+    
+    def OrderingByPalmsWithNeighbourFillingAndFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        
+        posision = self.handOrderingAnomalysByPalmCenterUsingNeighbourFilling(margin=margin)
+        
+        left = set(movement[0]) & set(posision[0])
+        right = set(movement[1]) & set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByWristsWithNeighbourFillingAndFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByWristUsingNeighbourFilling(margin=margin)
+        left = set(movement[0]) & set(posision[0])
+        right = set(movement[1]) & set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByExtremesWithNeighbourFillingAndFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByExtremesUsingNeighbourFilling(margin=margin)
+        left = set(movement[0]) & set(posision[0])
+        right = set(movement[1]) & set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByPalmsWithInterpolationAndFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByPalmCenterUsingInterpolation(margin=margin)
+        left = set(movement[0]) & set(posision[0])
+        right = set(movement[1]) & set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+
+    def OrderingByWristsWithInterpolationAndFilledMovmentByStdDevIntersection(self,
+                                                    position_threshold=-0.15, 
+                                                    num_std_dev=2.0,
+                                                    gap_size=5,
+                                                    margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByWristUsingInterpolation(margin=margin)
+        left = set(movement[0]) & set(posision[0])
+        right = set(movement[1]) & set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByExtremesWithInterpolationAndFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByExtremesUsingInterpolation(margin=margin)
+        left = set(movement[0]) & set(posision[0])
+        right = set(movement[1]) & set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByPalmsWithNeighbourFillingOrFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        
+        posision = self.handOrderingAnomalysByPalmCenterUsingNeighbourFilling(margin=margin)
+        
+        left = set(movement[0]) | set(posision[0])
+        right = set(movement[1]) | set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByWristsWithNeighbourFillingOrFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByWristUsingNeighbourFilling(margin=margin)
+        left = set(movement[0]) | set(posision[0])
+        right = set(movement[1]) | set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByExtremesWithNeighbourFillingOrFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByExtremesUsingNeighbourFilling(margin=margin)
+        left = set(movement[0]) | set(posision[0])
+        right = set(movement[1]) | set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByPalmsWithInterpolationOrFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByPalmCenterUsingInterpolation(margin=margin)
+        left = set(movement[0]) | set(posision[0])
+        right = set(movement[1]) | set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+
+    def OrderingByWristsWithInterpolationOrFilledMovmentByStdDevIntersection(self,
+                                                    position_threshold=-0.15, 
+                                                    num_std_dev=2.0,
+                                                    gap_size=5,
+                                                    margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByWristUsingInterpolation(margin=margin)
+        left = set(movement[0]) | set(posision[0])
+        right = set(movement[1]) | set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
+    def OrderingByExtremesWithInterpolationOrFilledMovmentByStdDevIntersection(self, 
+                                                   position_threshold=-0.15, 
+                                                   num_std_dev=2.0,
+                                                   gap_size=5,
+                                                   margin=0.0):
+        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev, 
+                                                        gap_size=gap_size)
+        posision = self.handOrderingAnomalysByExtremesUsingInterpolation(margin=margin)
+        left = set(movement[0]) | set(posision[0])
+        right = set(movement[1]) | set(posision[1])
+        return list(sorted(left)), list(sorted(right))
+    
