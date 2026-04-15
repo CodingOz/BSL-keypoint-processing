@@ -396,13 +396,13 @@ class TemporalCropping:
             return coarse_start, coarse_end
 
         # Search window spans [coarse_start - search_window, coarse_start + search_window]
-        # Walk leftward from coarse_start; refined start is the leftmost frame
-        # within the window where composite >= halfmax.
+        # Walk rightward from the left edge of the window; refined start is the
+        # leftmost frame where composite >= halfmax.
         search_left_start = max(0, coarse_start - search_window)
         search_left_end   = min(n - 1, coarse_start + search_window)
 
         refined_start = coarse_start
-        for i in range(search_left_end, search_left_start - 1, -1):
+        for i in range(search_left_start, search_left_end + 1):
             if composite[i] >= halfmax:
                 refined_start = i
                 break
@@ -483,8 +483,8 @@ class TemporalCropping:
         consecutive_exit = 0
 
         for t in range(fine_start - 1, -1, -1):
-            if combined_momentum[t] > mom_cap:
-                # Hit the momentum guard — hard stop
+            if combined_momentum[t] > mom_cap and proximity[t] < threshold:
+                # Hit the momentum guard AND proximity is low — hard stop
                 break
             if proximity[t] < threshold:
                 consecutive_exit += 1
@@ -505,7 +505,7 @@ class TemporalCropping:
         consecutive_exit = 0
 
         for t in range(fine_end + 1, n):
-            if combined_momentum[t] > mom_cap_ret:
+            if combined_momentum[t] > mom_cap_ret and proximity[t] < threshold:
                 break
             if proximity[t] < threshold:
                 consecutive_exit += 1
@@ -555,6 +555,18 @@ class TemporalCropping:
         # removes the last frame to match the length of the momentums
         palm_distances = palm_distances[:-1]
         closest_distances = closest_distances[:-1]
+        
+        # Check if we have enough frames for segmentation (minimum 12 required)
+        if len(palm_distances) < 12:
+            if show_logs:
+                print(f"Skipping {json_path}: only {len(palm_distances)} frames (need at least 12)")
+            # Copy the file as-is if too short
+            Path(destination_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+            with open(destination_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            return
         
         momentums = validator.getEstimatedMomentums()
         left_momentum = [momentum['left']['magnitude'] for momentum in momentums]
@@ -654,4 +666,3 @@ if __name__ == "__main__":
     target= r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus_Temporal_Cropping_level2"
     cropper = TemporalCropping()
     cropper.crop_to_stroke_phase_in_corpus(source, target, show_logs=True)
-    

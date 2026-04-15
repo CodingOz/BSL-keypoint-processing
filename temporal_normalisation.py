@@ -103,7 +103,8 @@ class TemporalNormalisor:
     def NormaliseCorpus(self, source_dir, target_dir, frame_num, show_logs=False):
         """
         Normalises all keypoint files in `source_dir` to `frame_num` frames and
-        writes them to `target_dir` with the same filenames.
+        writes them to `target_dir` with the same filenames, preserving nested
+        directory structure.
 
         takes:
             source_dir : str | Path
@@ -115,12 +116,18 @@ class TemporalNormalisor:
             show_logs : bool, optional
                 If True, prints progress logs to console.
             """
-        os.makedirs(target_dir, exist_ok=True)
-        for filename in os.listdir(source_dir):
-            if filename.endswith('.json'):
-                source_path = os.path.join(source_dir, filename)
-                target_path = os.path.join(target_dir, filename)
-                self.MakeNormalisedKeypointFile(source_path, target_path, frame_num)
-                if show_logs:
-                    print(f"Normalised {filename} to {frame_num} frames.")
+        from pathlib import Path
+        source_dir = Path(source_dir)
+        target_dir = Path(target_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
+        for source_path in source_dir.rglob('*.json'):
+            # Preserve relative directory structure in target
+            relative_path = source_path.relative_to(source_dir)
+            target_path = target_dir / relative_path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            self.MakeNormalisedKeypointFile(str(source_path), str(target_path), frame_num)
+            if show_logs:
+                print(f"Normalised {relative_path} to {frame_num} frames.")
         

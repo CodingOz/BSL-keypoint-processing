@@ -97,6 +97,8 @@ class CorpusValidator:
         return self.all_palm_accelerations
     
     def get_all_timings(self):
+        ''' returns a list of Sign_lengths dataclasses, one per file in the corpus, 
+        containing the first and last frame where a hand is detected '''
         if len(self.timings) > 0:
             return self.timings
         for validator in self.validators:

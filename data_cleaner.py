@@ -1,5 +1,4 @@
 import os
-
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from anomaly_detection import AnomalyDetection
 import json
@@ -9,8 +8,9 @@ class DataCleaner:
     '''
     Class that handles the data cleaning pipeline
     '''
-    def __init__(self, path):
+    def __init__(self, path, target_path=None):
         self.path = path
+        self.target_path = target_path if target_path is not None else path
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -27,63 +27,92 @@ class DataCleaner:
                 self.current = json.load(f)
                 self.versions = [copy.deepcopy(self.current)]
         except Exception as e:
-            print(f"Failed to read/parse json file '{path}': {e}")            
-
-    def detectAnomalousFrames(self, recursive_level=0, save_versions=False, show_logs=False):
-        '''Uses anomaly_detection to detect frames with anomalous hand keypoint data
-        then places these in metadata and reruns detection until non are found
+            print(f"Failed to read/parse json file '{path}': {e}")
+    
+    
+    def detectAnomalousFrames(self, 
+                          num_std_dev=1.8,
+                          position_threshold=-0.08,
+                          gap_size=4,
+                          margin=0.00,
+                          recursive_level=0, 
+                          save_versions=False, 
+                          show_logs=False):
+        '''Detects anomalous frames using ordering_wrist_neighbour + stddev
+        intersection, places them in metadata, and optionally reruns detection
+        until none are found. Writes only to self.target_path.
         
         takes:
-            recursive_level: number of recursions left to run (to prevent infinite loops)
-            save_versions: whether to save versions of the data at each recursive level for later comparison
+            num_std_dev: stddev threshold for movement detection
+            position_threshold: position threshold for the intersection
+            gap_size: gap-fill size for movement detection
+            margin: margin for the wrist ordering violation check
+            recursive_level: number of recursions left to run
+            save_versions: whether to save versions at each recursive level
             show_logs: whether to print logs of the cleaning process
         returns:
             tuple of lists: (anomaly_frames_left, anomaly_frames_right)
         '''
-        anomaly_frames_left, anomaly_frames_right = self.anomaly_detector.posisionAndFilledMovmentAnomalys(position_threshold=-0.1, 
-                                                               movement_threshole=0.1, 
-                                                               gap_size=5)
+        anomaly_frames_left, anomaly_frames_right = \
+            self.anomaly_detector.position_and_filled_movement_and_acceleration_anomalys(
+                movement_threshold=0.11,
+                position_threshold=-0.08,
+                gap_size=4
+            )
         if show_logs:
-            print(f"Recursive level {recursive_level}: Detected {len(anomaly_frames_left)} anomalous frames in left hand and {len(anomaly_frames_right)} in right hand.")
-            
+            print(f"Recursive level {recursive_level}: "
+                f"Detected {len(anomaly_frames_left)} anomalous frames in left hand "
+                f"and {len(anomaly_frames_right)} in right hand.")
+        
         if len(anomaly_frames_left) == 0 and len(anomaly_frames_right) == 0:
             if show_logs:
-                print("No anomalous frames detected by recursive level", recursive_level)
+                print(f"No anomalous frames detected at recursive level {recursive_level}")
+            # Still need to write the file even if nothing found, so the target 
+            # exists and the recursion's prior changes persist
+            self._writeCurrentToTarget()
             return anomaly_frames_left, anomaly_frames_right
         
-        else:
-            for frame in anomaly_frames_left:
-                self.current['metadata'].setdefault('left_anomalous_frames', []).append(self.current['frames'][frame])
-                # remove anomalous hand keypoints from main dataset
-                self.current['frames'][frame]['hands']['left'] = []
-                            
-            for frame in anomaly_frames_right:
-                self.current['metadata'].setdefault('right_anomalous_frames', []).append(self.current['frames'][frame])
-                # remove anomalous hand keypoints from main dataset
-                self.current['frames'][frame]['hands']['right'] = []
+        for frame in anomaly_frames_left:
+            self.current['metadata'].setdefault('left_anomalous_frames', []).append(
+                self.current['frames'][frame])
+            self.current['frames'][frame]['hands']['left'] = []
+        
+        for frame in anomaly_frames_right:
+            self.current['metadata'].setdefault('right_anomalous_frames', []).append(
+                self.current['frames'][frame])
+            self.current['frames'][frame]['hands']['right'] = []
         
         if save_versions:
-            # saves version of data with anomalous frames removed to versions list
             self.versions.append(copy.deepcopy(self.current))
         
-            
-        with open(self.path, 'w', encoding='utf-8') as f:
-            json.dump(self.current, f, indent=2)
-        self.validator = CubicSplineKeyPointInterpolator(self.path)
+        self._writeCurrentToTarget()
+        
+        # Rebuild the validator from the target file so the next recursive pass 
+        # sees the changes we just made, without touching the source
+        self.validator = CubicSplineKeyPointInterpolator(self.target_path)
         self.anomaly_detector = AnomalyDetection(self.validator)
         
         if recursive_level > 0:
-            recursive_level -= 1
-            
             left, right = self.detectAnomalousFrames(
-                recursive_level=recursive_level, 
-                save_versions=save_versions, show_logs=show_logs)
-            
-            return anomaly_frames_left+left, anomaly_frames_right+right
-            
-        else:
-            return anomaly_frames_left, anomaly_frames_right
+                num_std_dev=num_std_dev,
+                position_threshold=position_threshold,
+                gap_size=gap_size,
+                margin=margin,
+                recursive_level=recursive_level - 1,
+                save_versions=save_versions,
+                show_logs=show_logs,
+            )
+            return anomaly_frames_left + left, anomaly_frames_right + right
+        
+        return anomaly_frames_left, anomaly_frames_right
 
+
+    def _writeCurrentToTarget(self):
+        '''Ensures target directory exists, then writes self.current to it.'''
+        os.makedirs(os.path.dirname(self.target_path), exist_ok=True)
+        with open(self.target_path, 'w', encoding='utf-8') as f:
+            json.dump(self.current, f, indent=2)
+    
     def getAllMetadata(self):
         '''returns all metadata from the current data'''
         return self.current.get('metadata', {})
@@ -164,4 +193,78 @@ class DataCleaner:
             print(f"Restored {restored_count} frames with simultaneous hand anomalies")
         return 0
         
+def cleanCorpus(source_root, target_root,
+            num_std_dev=1.6,
+            position_threshold=-0.08,
+            gap_size=4,
+            margin=0.03,
+            recursive_level=3,
+            show_logs=False):
+    '''Walks a corpus directory and runs DataCleaner on every JSON file,
+    preserving the relative folder structure in the target directory.
+    
+    takes:
+        source_root: root directory of the source corpus
+        target_root: root directory where cleaned files will be written
+        num_std_dev, position_threshold, gap_size, margin: detection parameters
+        recursive_level: how many recursive cleaning passes to run per file
+        show_logs: verbose output
+    returns:
+        dict with counts of files processed, errors, and total anomalies removed
+    '''
+    stats = {
+        'files_processed': 0,
+        'files_failed': 0,
+        'total_left_anomalies': 0,
+        'total_right_anomalies': 0,
+        'failed_files': [],
+    }
+    
+    for dirpath, _, filenames in os.walk(source_root):
+        for fname in filenames:
+            if not fname.lower().endswith('.json'):
+                continue
+            # Skip non-sign files like dominance_labels.json at the root
+            if dirpath == source_root:
+                continue
             
+            source_file = os.path.join(dirpath, fname)
+            rel_path = os.path.relpath(source_file, source_root)
+            target_file = os.path.join(target_root, rel_path)
+            
+            if show_logs:
+                print(f"Cleaning {rel_path}")
+            
+            try:
+                cleaner = DataCleaner(path=source_file, target_path=target_file)
+                left, right = cleaner.detectAnomalousFrames(
+                    num_std_dev=num_std_dev,
+                    position_threshold=position_threshold,
+                    gap_size=gap_size,
+                    margin=margin,
+                    recursive_level=recursive_level,
+                    show_logs=False,
+                )
+                stats['files_processed'] += 1
+                stats['total_left_anomalies'] += len(left)
+                stats['total_right_anomalies'] += len(right)
+            except Exception as e:
+                stats['files_failed'] += 1
+                stats['failed_files'].append((rel_path, str(e)))
+                print(f"  FAILED {rel_path}: {e}")
+    
+    print(f"\n=== Corpus cleaning complete ===")
+    print(f"Files processed: {stats['files_processed']}")
+    print(f"Files failed:    {stats['files_failed']}")
+    print(f"Total left anomalies removed:  {stats['total_left_anomalies']}")
+    print(f"Total right anomalies removed: {stats['total_right_anomalies']}")
+    
+    return stats
+
+
+if __name__ == "__main__":
+    cleanCorpus(
+        source_root=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\UNPROCCESSED_KEYPOINTS_V1",
+        target_root=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\CLEANED_KEYPOINTS_V1",
+        show_logs=True,
+    )

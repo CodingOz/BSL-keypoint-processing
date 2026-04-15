@@ -228,183 +228,215 @@ class RunDetectionTests:
         
         'ordering_extremes_interpolation_stddev_union': lambda det, **p: (
             det.OrderingByExtremesWithInterpolationOrFilledMovmentByStdDevIntersection(**p)
+        ),
+        
+        'acceleration_only': lambda det, **p: det.AccelerationAnomalys(**p),
+
+        
+        'position_and_filled_movement_and_acceleration': lambda det, **p: (
+            det.position_and_filled_movement_and_acceleration_anomalys(**p)
+        ),
+        
+        'appearance_disappearance': lambda det, **p: (
+            det.findAppearanceDisappearanceSwaps(**p)
         )
     }
     
     # Default parameter grids — each is a list of kwarg dicts to trial
     DEFAULT_PARAM_GRIDS: dict[str, list[dict]] = {
         'movement_only': [
-            {'threshold': t} for t in [0.10, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.20]
+            {'threshold': t} for t in [0.15, 0.16, 0.17, 0.18, 0.19]
         ],
         'position_only': [
-            {'threshold': t} for t in [-0.02, -0.03, -0.04, -0.05, -0.06, -0.07, -0.08, -0.10]
+            {'threshold': t} for t in [-0.06, -0.07, -0.08, -0.09, -0.10]
         ],
         'filled_movement': [
             {'threshold': t, 'gap_size': g}
-            for t in [0.08, 0.09, 0.10, 0.11, 0.12, 0.13, 0.15]
-            for g in [4, 5, 6]
+            for t in [0.09, 0.10, 0.11, 0.12, 0.13]
+            for g in [3, 4, 5]
         ],
         'position_and_filled_movement': [
             {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g}
-            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
+            for mt in [0.10, 0.11, 0.12, 0.13]
+            for pt in [-0.07, -0.08, -0.09, -0.10]
+            for g in [2, 3]
         ],
         # --- relative movement variants ---
         'filled_relative_mad': [
             {'threshold': t, 'gap_size': g}
-            for t in [4.5, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.5]
-            for g in [4, 5, 6]
+            for t in [5.2, 5.3, 5.4, 5.5, 5.6]
+            for g in [3, 4, 5]
         ],
         'filled_relative_percentile': [
             {'percentile': p, 'gap_size': g}
-            for p in [94, 95, 96, 97, 98, 99]
-            for g in [4, 5, 6]
+            for p in [96, 97, 98, 99]
+            for g in [3, 4, 5]
         ],
         'filled_relative_stddev': [
             {'num_std_dev': s, 'gap_size': g}
-            for s in [1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-            for g in [4, 5, 6]
+            for s in [2.1, 2.2, 2.3, 2.4]
+            for g in [3, 4, 5]
         ],
         
         'position_and_filled_movement_by_stddev': [
             {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g, 'num_std_dev': s}
-            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for s in [1.8, 1.9, 2.0, 2.1, 2.2]
+            for mt in [0.07, 0.08, 0.09, 0.10]
+            for pt in [-0.07, -0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for s in [2.0, 2.1, 2.2, 2.3]
         ],
         
         'position_and_filled_movement_by_mad': [
             {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g, 'threshold': t}
-            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for t in [4.5, 4.7, 4.9, 5.0, 5.1, 5.3, 5.5]
+            for mt in [0.07, 0.08, 0.09, 0.10]
+            for pt in [-0.07, -0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for t in [5.3, 5.4, 5.5, 5.6]
         ],
 
         'position_and_filled_movement_by_percentile': [ 
             {'movement_threshole': mt, 'position_threshold': pt, 'gap_size': g, 'percentile': p}
-            for mt in [0.08, 0.09, 0.10, 0.11, 0.12]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [4, 5, 6]
-            for p in [94, 95, 96, 97, 98, 99]
+            for mt in [0.07, 0.08, 0.09, 0.10]
+            for pt in [-0.07, -0.08, -0.09, -0.10]
+            for g in [3, 4, 5]
+            for p in [97, 98, 99]
         ],
         
         'position_and_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g}
-            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
-            for pt in [-0.03, -0.04, -0.05, -0.06, -0.07]
-            for g in [4, 5, 6]
+            for s in [1.1, 1.2, 1.3, 1.4, 1.5]
+            for pt in [-0.02, -0.03, -0.04, -0.05]
+            for g in [3, 4, 5]
         ],
         'ordering_palm_center_neighbour': [
             {'margin': m}
-            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+            for m in [0.06, 0.07, 0.08, 0.09]
         ],
         'ordering_wrist_neighbour': [
             {'margin': m}
-            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+            for m in [0.06, 0.07, 0.08, 0.09]
         ],
         'ordering_extremes_neighbour': [
             {'margin': m}
-            for m in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+            for m in [0.0, 0.01, 0.02, 0.03]
         ],
         'ordering_palm_center_interpolation': [
             {'margin': m}
-            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+            for m in [0.06, 0.07, 0.08, 0.09]
         ],
         'ordering_wrist_interpolation': [
             {'margin': m}
-            for m in [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+            for m in [0.06, 0.07, 0.08, 0.09]
         ],
         'ordering_extremes_interpolation': [
             {'margin': m}
-            for m in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+            for m in [0.0, 0.01, 0.02, 0.03]
         ],
         'ordering_palm_center_neighbour_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [4, 5, 6]
-            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+            for s in [1.2, 1.3, 1.4]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [4, 5]
+            for m in [0.003, 0.005, 0.01]
         ],
         'ordering_wrist_neighbour_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [4, 5, 6]
-            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+            for s in [1.2, 1.3, 1.4]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [4, 5]
+            for m in [0.003, 0.005, 0.01]
         ],
         'ordering_extremes_neighbour_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for m in [0.0, 0.005, 0.01, 0.015, 0.02]
+            for s in [1.2, 1.3, 1.4]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for m in [0.0, 0.005, 0.01]
         ],
         'ordering_palm_center_interpolation_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [4, 5, 6]
-            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+            for s in [1.2, 1.3, 1.4]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [4, 5]
+            for m in [0.003, 0.005, 0.01]
         ],
         'ordering_wrist_interpolation_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [4, 5, 6]
-            for m in [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+            for s in [1.2, 1.3, 1.4]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [4, 5]
+            for m in [0.003, 0.005, 0.01]
         ],
         'ordering_extremes_interpolation_stddev_intersection': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for m in [0.0, 0.005, 0.01, 0.015, 0.02]
+            for s in [1.2, 1.3, 1.4]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for m in [0.0, 0.005, 0.01]
         ],
         'ordering_palm_center_neighbour_stddev_union': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for m in [0.01, 0.02, 0.03, 0.04, 0.05]
+            for s in [2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for m in [0.03, 0.04, 0.05]
         ],
         'ordering_wrist_neighbour_stddev_union': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for m in [0.01, 0.02, 0.03, 0.04, 0.05]
+            for s in [2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for m in [0.03, 0.04, 0.05]
         ],
         'ordering_extremes_neighbour_stddev_union': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [4, 5, 6]
-            for m in [0.0, 0.01, 0.02, 0.03]
+            for s in [2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [4, 5]
+            for m in [0.0, 0.01, 0.02]
         ],
         'ordering_palm_center_interpolation_stddev_union': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for m in [0.0, 0.01, 0.02, 0.03, 0.04]
+            for s in [2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for m in [0.0, 0.01, 0.02]
         ],
         'ordering_wrist_interpolation_stddev_union': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [2, 3, 4, 5]
-            for m in [0.01, 0.02, 0.03, 0.04, 0.05]
+            for s in [2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [2, 3]
+            for m in [0.01, 0.02, 0.03]
         ],
         'ordering_extremes_interpolation_stddev_union': [
             {'num_std_dev': s, 'position_threshold': pt, 'gap_size': g, 'margin': m}
-            for s in [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-            for pt in [-0.08, -0.09, -0.10, -0.11, -0.12]
-            for g in [4, 5, 6]
-            for m in [0.0, 0.01, 0.02, 0.03]
+            for s in [2.1, 2.2, 2.3]
+            for pt in [-0.08, -0.09, -0.10]
+            for g in [4, 5]
+            for m in [0.0, 0.01, 0.02]
         ],
+        
+        'acceleration_only': [
+            {'threshold': t, 'inclusive': inc, 'interpolate_missing': interp}
+            for t in [0.05, 0.06,0.07, 0.08, 0.09, 0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
+            for inc in [True, False]
+            for interp in [True, False]
+        ],
+        
+        'position_and_filled_movement_and_acceleration': [
+            {'position_threshold': pt, 'movement_threshold': mt, 'acceleration_threshold': at, 'gap_size': g}
+            for pt in [-0.08, -0.09, -0.10]
+            for mt in [0.09, 0.10, 0.11]
+            for at in [0.14, 0.15, 0.16]
+            for g in [2, 3]
+        ],
+        
+        'appearance_disappearance': [
+            {'max_gap': g, 'distance_threshold': d}
+            for g in [1, 2, 3]
+            for d in [0.05, 0.10, 0.15, 0.20, 0.30]
+        ]
     }
 
     def __init__(self, corpus_path: str, param_grids: dict[str, list[dict]] | None = None, show_logs=False):
@@ -553,7 +585,10 @@ class RunDetectionTests:
                         summaries[key].per_file.append(file_result)
 
                     except Exception as e:
-                        print(f"    ERROR [{method_name}] {params}: {e}")
+                        import traceback
+                        error_msg = f"{type(e).__name__}: {str(e)}"
+                        print(f"    ERROR [{method_name}] {params}: {error_msg}")
+                        traceback.print_exc()
 
         return summaries# reporting
     
@@ -826,8 +861,9 @@ if __name__ == "__main__":
     simple_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified"
     gaussian_corpus_path=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Test_corpus_with_gaussian_using_momentum_heuristics"
     simple_corpus_path_copy=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified_stratified - Copy"
+    ground_truth_based_corpus_paths=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_from_gound_truth_distribution_stratified"
     runner = RunDetectionTests(
-        corpus_path=simple_corpus_path
+        corpus_path=ground_truth_based_corpus_paths
     )
 
     # run all methods with default param grids

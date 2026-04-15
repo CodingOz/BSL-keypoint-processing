@@ -60,7 +60,7 @@ class SpatialNormalisor:
     def normaliseCorpus(self, source_dir, target_dir):
         """
         Apply spatial normalisation to every *.json file in source_dir and
-        write the results to target_dir, preserving filenames.
+        write the results to target_dir, preserving nested directory structure.
 
         Args:
             source_dir (str | Path): directory containing temporally-normalised files.
@@ -69,28 +69,31 @@ class SpatialNormalisor:
         Returns:
             list[dict]: list of (source_path, target_path, success, error) records.
         """
-        source_dir = str(source_dir)
-        target_dir = str(target_dir)
+        from pathlib import Path
+        source_dir = Path(source_dir)
+        target_dir = Path(target_dir)
         os.makedirs(target_dir, exist_ok=True)
 
-        paths = sorted(glob.glob(os.path.join(source_dir, '*.json')))
+        paths = sorted(source_dir.rglob('*.json'))
         if not paths:
             print(f"[SpatialNormalisation] No JSON files found in {source_dir}")
             return []
 
         results = []
         for src in paths:
-            filename = os.path.basename(src)
-            tgt      = os.path.join(target_dir, filename)
+            # Preserve relative directory structure in target
+            relative_path = src.relative_to(source_dir)
+            tgt      = target_dir / relative_path
+            tgt.parent.mkdir(parents=True, exist_ok=True)
             try:
-                self.normalise(src, tgt)
-                results.append({'source': src, 'target': tgt,
+                self.normalise(str(src), str(tgt))
+                results.append({'source': str(src), 'target': str(tgt),
                                  'success': True,  'error': None})
-                print(f"success: {filename}")
+                print(f"success: {relative_path}")
             except Exception as e:
-                results.append({'source': src, 'target': tgt,
+                results.append({'source': str(src), 'target': str(tgt),
                                  'success': False, 'error': str(e)})
-                print(f"failed: {filename}  —  {e}")
+                print(f"failed: {relative_path}  —  {e}")
 
         n_ok  = sum(1 for r in results if r['success'])
         n_err = len(results) - n_ok

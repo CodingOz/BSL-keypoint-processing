@@ -1291,25 +1291,50 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
 
         keypoint_data = self.getKeyPointsAsLists()
         n = len(keypoint_data)
+        
+        # Adjust kernel size if data is too small
+        kernel_size = min(smoothing_window, n if n > 0 else 1)
+        if kernel_size % 2 == 0:
+            kernel_size -= 1
+        kernel_size = max(1, kernel_size)
 
         left_scales  = np.empty(n)
         right_scales = np.empty(n)
 
         for frame_idx, frame in enumerate(keypoint_data):
             for side, out_array in (('left', left_scales), ('right', right_scales)):
-                landmarks = frame[side]  # list of 41 [x, y] entries; all valid at this stage
-
+                landmarks = frame[side]  # list of 41 [x, y] entries; None if hand is missing
+                
+                # Handle missing hands (after cropping, some frames may have None)
+                if landmarks is None or len(landmarks) < 13:
+                    out_array[frame_idx] = np.nan
+                    continue
+                
                 wrist  = landmarks[0]   # landmark 0 — wrist
                 mid_tip = landmarks[12] # landmark 12 — middle fingertip
+                
+                # Check if landmarks are valid
+                if wrist is None or mid_tip is None or None in wrist or None in mid_tip:
+                    out_array[frame_idx] = np.nan
+                    continue
 
                 out_array[frame_idx] = math.hypot(
                     mid_tip[0] - wrist[0],
                     mid_tip[1] - wrist[1],
                 )
 
-        # Median-filter each hand's scale sequence independently
-        left_smoothed  = medfilt(left_scales,  kernel_size=smoothing_window).astype(float)
-        right_smoothed = medfilt(right_scales, kernel_size=smoothing_window).astype(float)
+        # Fill NaN values with forward-fill then backward-fill, or use mean as fallback
+        left_scales = self._fillNaNSequence(left_scales)
+        right_scales = self._fillNaNSequence(right_scales)
+
+        # Median-filter each hand's scale sequence independently (only if kernel_size > 1)
+        if kernel_size > 1:
+            left_smoothed  = medfilt(left_scales,  kernel_size=kernel_size).astype(float)
+            right_smoothed = medfilt(right_scales, kernel_size=kernel_size).astype(float)
+        else:
+            left_smoothed = left_scales.astype(float)
+            right_smoothed = right_scales.astype(float)
+        
         combined       = np.maximum(left_smoothed, right_smoothed)
 
         return {
@@ -1317,7 +1342,26 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
             'right':    right_smoothed,
             'combined': combined,
         }
-
+    
+    @staticmethod
+    def _fillNaNSequence(sequence):
+        """Fill NaN values in a sequence using forward-fill, backward-fill, then mean."""
+        arr = np.array(sequence, dtype=float)
+        
+        # Forward fill
+        mask = np.isnan(arr)
+        idx = np.where(~mask, np.arange(len(mask)), 0)
+        idx = np.maximum.accumulate(idx)
+        arr[mask] = arr[idx[mask]]
+        
+        # If still NaN (all were NaN), use mean
+        if np.any(np.isnan(arr)):
+            valid_mean = np.nanmean(arr)
+            if np.isnan(valid_mean):
+                valid_mean = 1.0  # fallback default
+            arr[np.isnan(arr)] = valid_mean
+        
+        return arr
 
     @staticmethod
     def _nearestFill(sequence):
@@ -1545,8 +1589,6 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         
         return violations
     
-    
-    
     def findHandOrderingByPalmCenterUsingInterpolation(self, margin=0.0, show_logs=False):
         """Flags frames where the left palm center X > right palm center X.
         
@@ -1715,3 +1757,76 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
                   f"{len(violations)} violations out of {len(keypoint_data)} frames")
         
         return violations
+    
+    def findAccelerationClusters(self, 
+                                 margin=0.0, 
+                                 show_logs=False, 
+                                 inclusive=True, 
+                                 interpolate_missing=False):
+        '''
+        When there are 3 simaltaneous peaks in the acceleration of the hands, 
+        it is likely that media pipe hands has switched the hand labels.
+        This function finds these peaks and returns the index of the frame 
+        in the center all 3 frames.
+        
+        takes:
+            margin: minimum acceleration required to count as a peak
+            show_logs: if true, prints the number of clusters found and the total number of frames
+            inclusive: if true, includes all frames in the center of 3 peaks 
+                so if there are 6 peaks in a row, it will include frames 2,3,4,5
+                if its false, it will only include the center frame of 3 peaks, so in the previous example 
+                it would only include frame 2 (with sides 1, 2, 3) and 5 (with sides 4, 5, 6)
+             
+        returns:
+            list of all susputions frame indexs 
+        '''
+        
+        if interpolate_missing:
+            accelerations = self.getEstimatedAccelerations()
+        else:
+            accelerations = self.getAccelerations()
+        
+        for acceleration in accelerations:
+            accel = acceleration['acceleration']  # unwrap the nesting
+            
+            if accel['left'].get('est'):
+                accel['left']['is_peak'] = False
+            else:
+                accel['left']['is_peak'] = accel['left']['acceleration'] > margin
+                
+            if accel['right'].get('est'):
+                accel['right']['is_peak'] = False
+            else:
+                accel['right']['is_peak'] = accel['right']['acceleration'] > margin
+        left_clusters = []
+        right_clusters = []
+
+        for i in range(1, len(accelerations) - 1):
+            left_peaks = (accelerations[i-1]['acceleration']['left']['is_peak'],
+                  accelerations[i]['acceleration']['left']['is_peak'],
+                  accelerations[i+1]['acceleration']['left']['is_peak'])
+            right_peaks = (accelerations[i-1]['acceleration']['right']['is_peak'], 
+                            accelerations[i]['acceleration']['right']['is_peak'], 
+                            accelerations[i+1]['acceleration']['right']['is_peak'])
+            
+            if all(left_peaks):
+                if inclusive:
+                    left_clusters.append(i+1)
+                elif not (i-1 in left_clusters or i-2 in left_clusters):
+                    left_clusters.append(i+1)
+                
+                    
+            if all(right_peaks):
+                if inclusive:
+                    right_clusters.append(i+1)
+                elif not (i-1 in right_clusters or i-2 in right_clusters):
+                    right_clusters.append(i+1)
+                    
+        if show_logs:
+            print(f"findAccelerationClusters(margin={margin}, inclusive={inclusive}): "
+                  f"{len(left_clusters)} left clusters, {len(right_clusters)} right clusters out of {len(accelerations)} frames")
+        
+        return {
+            'left': left_clusters,
+            'right': right_clusters
+        }

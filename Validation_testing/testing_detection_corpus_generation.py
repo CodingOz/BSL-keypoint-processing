@@ -12,18 +12,26 @@ from scipy.stats import norm
 from dataclasses import dataclass
 from typing import List, Tuple, Dict
 
-
 @dataclass
 class DegradationPattern:
     """Defines the degradation pattern for a single file."""
     num_swaps: int
     swap_sizes: List[int]
+    swap_types: List[str] = None       # 'symmetric' or 'single_hand'
+    swap_directions: List[str] = None  # 'right_to_left', 'left_to_right', or None (for symmetric)
     
     def __post_init__(self):
         if len(self.swap_sizes) != self.num_swaps:
             raise ValueError(f"Number of swap_sizes must equal num_swaps ({self.num_swaps})")
-
-
+        if self.swap_types is None:
+            self.swap_types = ['single_hand'] * self.num_swaps
+        if len(self.swap_types) != self.num_swaps:
+            raise ValueError(f"Number of swap_types must equal num_swaps ({self.num_swaps})")
+        if self.swap_directions is None:
+            self.swap_directions = [None] * self.num_swaps
+        if len(self.swap_directions) != self.num_swaps:
+            raise ValueError(f"Number of swap_directions must equal num_swaps ({self.num_swaps})")
+        
 class LayeredGaussianDistribution:
     """
     Generates frame sampling locations using a 4-component layered Gaussian mixture.
@@ -166,7 +174,6 @@ class CorpusDegradator:
         returns:
             Dictionary with degradation statistics and metadata
         '''
-        
         return self._apply_with_sampler(
             patterns,
             output_path   = self.output_corpus_path,
@@ -273,6 +280,7 @@ class CorpusDegradator:
         for idx, (filepath, pattern) in enumerate(zip(self.corpus_files, patterns)):
             print(f"\n[{idx+1}/{len(self.corpus_files)}] {os.path.basename(filepath)}"
                 f"  ({sampler_label})")
+            print(f"  Pattern: {pattern.num_swaps} swaps, sizes={pattern.swap_sizes}, types={pattern.swap_types}")
 
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
@@ -328,11 +336,21 @@ class CorpusDegradator:
                     tight_area = (best_start, best_start + swap_size + 1)
                     used_frames |= set(range(best_start, best_start + swap_size))
 
-                    degraded_data = self.degradator.frameSwap(
-                        degraded_data,
-                        hole_size=swap_size,
-                        available_area=tight_area,
-                    )
+                    swap_type = pattern.swap_types[swap_idx] if pattern.swap_types else 'symmetric'
+                    
+                    if swap_type == 'single_hand':
+                        degraded_data = self.degradator.singleHandSwap(
+                            degraded_data,
+                            hole_size=swap_size,
+                            available_area=tight_area,
+                        )
+                    else:
+                        degraded_data = self.degradator.frameSwap(
+                            degraded_data,
+                            hole_size=swap_size,
+                            available_area=tight_area,
+                        )
+                    
                     swap_info.append({
                         'swap_index':    swap_idx,
                         'size':          swap_size,
@@ -361,9 +379,26 @@ class CorpusDegradator:
                 })
 
         results['statistics'] = self._compute_statistics(results['degraded_files'])
+        
+        # DEBUG: Print actual degradation summary
+        print(f"\n=== Degradation Summary ===")
+        successful = [f for f in results['degraded_files'] if 'error' not in f]
+        print(f"Successful: {len(successful)}/{len(results['degraded_files'])}")
+        total_actual_swaps = sum(len(f.get('swap_details', [])) for f in successful)
+        total_expected_swaps = sum(p.num_swaps for p in patterns)
+        print(f"Expected swaps: {total_expected_swaps}, Actual degradations applied: {total_actual_swaps}")
+        
+        # Check for files with no actual hand data changes
+        no_change_count = 0
+        for f in successful:
+            for swap in f.get('swap_details', []):
+                if swap.get('hand_coverage', 0) == 0:
+                    no_change_count += 1
+        if no_change_count > 0:
+            print(f"WARNING: {no_change_count} degradations had 0 hand coverage!")
+        
         return results
 
-    #  public apply methods
     
     def apply_pattern_uniform(self, patterns: list, output_path: str = None) -> dict:
         """
@@ -400,6 +435,87 @@ class CorpusDegradator:
             sampler       = sampler,
             sampler_label = f'stratified(k={n_strata})',
         )
+
+def create_realistic_degradation_patterns(num_files) -> List[DegradationPattern]:
+    """Creates degradation patterns that match real MediaPipe error characteristics:
+    
+    takes:
+        num_files: number of files in the corpus to generate patterns for
+    returns:
+        List of DegradationPattern objects, one per file
+    """
+    patterns = []
+    
+    # Distribution: ~40% clean, ~40% one swap, ~15% two swaps, ~5% three swaps
+    swap_counts = []
+    for _ in range(num_files):
+        r = np.random.random()
+        if r < 0.40:
+            swap_counts.append(0)
+        elif r < 0.80:
+            swap_counts.append(1)
+        elif r < 0.95:
+            swap_counts.append(2)
+        else:
+            swap_counts.append(3)
+    
+    for n_swaps in swap_counts:
+        if n_swaps == 0:
+            patterns.append(DegradationPattern(num_swaps=0, swap_sizes=[], swap_types=[]))
+            continue
+        
+        sizes = []
+        types = []
+        
+        for _ in range(n_swaps):
+            # Size distribution: ~70% size 1, ~20% size 2, ~10% size 3
+            size_r = np.random.random()
+            if size_r < 0.71:
+                sizes.append(1)
+            elif size_r < 0.90:
+                sizes.append(2)
+            elif size_r < 0.96:
+                sizes.append(3)
+            else:
+                sizes.append(4)
+            
+            # Type distribution: ~80% single-hand, ~20% symmetric
+            type_r = np.random.random()
+            if type_r < 0.80:
+                types.append('single_hand')
+            else:
+                types.append('symmetric')
+        
+        patterns.append(DegradationPattern(
+            num_swaps=n_swaps,
+            swap_sizes=sizes,
+            swap_types=types,
+        ))
+    
+    # Print summary
+    total_swaps = sum(p.num_swaps for p in patterns)
+    clean_files = sum(1 for p in patterns if p.num_swaps == 0)
+    single_hand = sum(1 for p in patterns for t in p.swap_types if t == 'single_hand')
+    symmetric = sum(1 for p in patterns for t in p.swap_types if t == 'symmetric')
+    size_1 = sum(1 for p in patterns for s in p.swap_sizes if s == 1)
+    size_2 = sum(1 for p in patterns for s in p.swap_sizes if s == 2)
+    size_3 = sum(1 for p in patterns for s in p.swap_sizes if s == 3)
+    
+    print(f"Realistic degradation patterns for {num_files} files:")
+    print(f"  Clean files:    {clean_files}/{num_files} ({100*clean_files/num_files:.0f}%)")
+    print(f"  Total swaps:    {total_swaps}")
+    print(f"  Single-hand:    {single_hand} ({100*single_hand/max(total_swaps,1):.0f}%)")
+    print(f"  Symmetric:      {symmetric} ({100*symmetric/max(total_swaps,1):.0f}%)")
+    print(f"  Size 1:         {size_1}  Size 2: {size_2}  Size 3: {size_3}")
+    
+    # DEBUG: Verify patterns were created correctly
+    print(f"\nDEBUG: Pattern validation:")
+    for i, p in enumerate(patterns[:3]):  # Print first 3 patterns
+        print(f"  Pattern {i}: num_swaps={p.num_swaps}, swap_sizes={p.swap_sizes}, swap_types={p.swap_types}")
+    print(f"  ... ({len(patterns)} total patterns)")
+    
+    return patterns
+ 
 
 
 def create_default_degradation_patterns() -> List[DegradationPattern]:
@@ -454,35 +570,13 @@ if __name__ == "__main__":
     }
     
     base_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_SubCorpus"
-    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Uniform"
-    
-    
-    patterns = create_default_degradation_patterns()
-    
+    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_from_gound_truth_distribution"
+        
     degradator = CorpusDegradator(base_corpus_path, 
-                                  output_corpus_path, 
+                                  output_corpus_path,
                                   gaussian_config=gaussian_config)
     
-    #results = degradator.apply_pattern_uniform(patterns)
-    
-    
-    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Testing_Corpus_Stratified"
-    
-    
-    patterns = create_default_degradation_patterns()
-    
-    degradator = CorpusDegradator(base_corpus_path, 
-                                  output_corpus_path, 
-                                  gaussian_config=gaussian_config)
-    
-    #results = degradator.apply_pattern_stratified(patterns, n_strata=5)
-    
-    
-    output_corpus_path = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validation_testing\Test_corpus_with_gaussian_using_momentum_heuristics"
-    
-    degradator = CorpusDegradator(base_corpus_path, 
-                                  output_corpus_path, 
-                                  gaussian_config=gaussian_config)
-    
-    results = degradator.apply_pattern(patterns)
+    patterns = create_realistic_degradation_patterns(len(degradator.corpus_files))      
+
+    results = degradator.apply_pattern_stratified(patterns, n_strata=5)
     

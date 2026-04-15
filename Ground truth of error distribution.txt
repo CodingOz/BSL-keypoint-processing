@@ -1,0 +1,205 @@
+checking number of errors in 5 random signs of each type 
+its formatted as left: 3 means one error with length 3 while right: 1, 1, 2 if 2 errors of length 1 and 1 error of length 2 ect 
+
+A:
+
+left:	0
+right:	0
+
+left: 	0
+right:	1
+
+left: 	0
+right:	1
+
+left: 	0
+right:	1
+
+left: 	1
+right:	0
+
+E
+
+left: 	0
+right:	0
+
+left: 	0
+right:	1
+
+left: 	0
+right:	3
+
+left: 	0
+right:	2, 1, 2
+
+left: 	0
+right:	0
+
+I
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+left: 	0
+right:	1
+
+left: 	1
+right:	1
+
+left: 	0
+right:	0
+
+O
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+left: 	1
+right:	
+
+left: 	0
+right:	2, 1, 1
+
+left: 	0
+right:	3
+
+
+U
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+left: 	0
+right:	1, 1, 1
+
+left: 	0
+right:	0
+
+left: 	1
+right:	0
+
+
+J
+
+left: 	0 
+right:	4, 2, 2
+
+left: 	0
+right:	1
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+left: 	0
+right:	1
+
+B
+
+left: 	0
+right:	3
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+left: 	1
+right:	0
+
+left: 	0
+right:	0
+
+
+N
+
+
+left: 	0
+right:	1
+
+left: 	1, 2
+right:	1, 1, 4
+	
+left: 	0
+right:	0
+
+left: 	0
+right:	1, 1
+
+left: 	0
+right:	1
+
+S
+
+left: 	1
+right:	0
+
+left: 	0
+right:	0
+
+left: 	1
+right:	0
+
+left: 	0
+right:	0
+
+left: 	2
+right:	1, 1
+
+T
+
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+left: 	2
+right:	0
+
+left: 	0
+right:	1
+
+left: 	0
+right:	0
+
+P
+
+
+left: 	2
+right:	0
+
+left: 	1
+right:	1, 1
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+left: 	0
+right:	0
+
+
+
+
+
+
+
+
+
+
