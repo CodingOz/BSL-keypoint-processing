@@ -95,14 +95,17 @@ class GraphView(pg.GraphicsLayoutWidget):
                     
                     if meta_key in self.point_metadata:
                         meta = self.point_metadata[meta_key]
+                        x_val = meta.get('x', 0.0)
+                        y_val = meta.get('y', 0.0)
+                        z_val = meta.get('z', 0.0)
                         tooltip_text = (
                             f"File: {key[0]}\n"
                             f"Cluster: {key[1]}\n"
                             f"Cluster ID: {meta.get('cluster_id')}\n"
                             f"Landmark ID: {meta.get('landmark_id')}\n"
-                            f"X: {meta.get('x'):.4f}\n"
-                            f"Y: {meta.get('y'):.4f}\n"
-                            f"Z: {meta.get('z'):.4f}"
+                            f"X: {x_val:.4f}\n"
+                            f"Y: {y_val:.4f}\n"
+                            f"Z: {z_val:.4f}"
                         )
                         now = time.time()
                         # show tooltip immediately when changing point, otherwise

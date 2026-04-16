@@ -23,7 +23,7 @@ def formal_proccessing_pipeline(start_corpus, show_logs=False):
 
     # Step 4: temporal normalisation
     temporal_normaliser = TemporalNormalisor()
-    temporal_normaliser.NormaliseCorpus(start_corpus + "_cleaned_interpolated_cropped", start_corpus + "_cleaned_interpolated_cropped_time_normilsied", frame_num=20, show_logs=show_logs)
+    temporal_normaliser.NormaliseCorpus(start_corpus + "_cleaned_interpolated_cropped", start_corpus + "_cleaned_interpolated_cropped_time_normilsied", frame_num=10, show_logs=show_logs)
 
     # level 3: spatial normalisation
     spatial_normaliser = SpatialNormalisor()
@@ -31,6 +31,9 @@ def formal_proccessing_pipeline(start_corpus, show_logs=False):
     
     
 if __name__ == "__main__":
+    start_corpus =r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\keypoints_V1"
+    formal_proccessing_pipeline(start_corpus)
+    
     start_corpus =r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\keypoints_V2"
-    formal_proccessing_pipeline(start_corpus, show_logs=True)
+    formal_proccessing_pipeline(start_corpus)
     

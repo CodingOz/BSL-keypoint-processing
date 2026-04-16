@@ -42,7 +42,8 @@ class HandDominanceNormaliser:
             hands["left"], hands["right"] = hands["right"], hands["left"]
             for side in ("left", "right"):
                 for lm in hands[side]:
-                    lm["cluster_id"] = 1 if lm["cluster_id"] == 0 else 0
+                    if "cluster_id" in lm:
+                        lm["cluster_id"] = 1 if lm["cluster_id"] == 0 else 0
                     lm["x"] = 1.0 - lm["x"]
 
         data["metadata"]["swapped_dominance"] = True
@@ -435,7 +436,8 @@ if __name__ == "__main__":
     target = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Unproccessed_keypoints_V2"
     
     dom_hander = HandDominanceNormaliser()
-    dom_hander.matchSwappedCorpus(root_dir, target, show_logs=True)
+    dom_hander.swapToRightDominant(filepath=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\keypoints_V2\O\89abb1f9-9daf-48bd-96cd-b0c4afdfa311.json", show_logs=True)
+    dom_hander.swapToRightDominant(filepath=r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\keypoints_V2\U\89abb1f9-9daf-48bd-96cd-b0c4afdfa311.json", show_logs=True)
     '''
     app = QApplication(sys.argv)
     window = DominanceLabellingWindow(root_dir=root_dir)
