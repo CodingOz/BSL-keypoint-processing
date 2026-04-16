@@ -1,0 +1,18 @@
+{
+  "corpus_name": "v4_12points_angles_and_distances_mixed",
+  "total_files": 333,
+  "features_per_file": "mixed",
+  "signs": [
+    "P",
+    "U",
+    "I",
+    "A",
+    "T",
+    "S",
+    "E",
+    "N",
+    "B",
+    "J",
+    "O"
+  ]
+}
