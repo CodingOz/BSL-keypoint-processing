@@ -1,0 +1,18 @@
+{
+  "corpus_name": "v7_interhand_distances_only_360",
+  "total_files": 327,
+  "features_per_file": 360,
+  "signs": [
+    "N",
+    "O",
+    "U",
+    "I",
+    "A",
+    "E",
+    "P",
+    "S",
+    "J",
+    "B",
+    "T"
+  ]
+}

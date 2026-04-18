@@ -21,7 +21,7 @@ class BSLDataset(Dataset):
     def __init__(self, features, labels, augment=False, noise_std=0.03,
                  time_shift_max=1, scale_range=(0.95, 1.05)):
         """
-        Args:
+        takes:
             features: np.ndarray of shape (N, num_features, num_frames)
                       already scaled and transposed.
             labels:   np.ndarray of int class indices.
@@ -63,14 +63,14 @@ class BSLConv1DNet(nn.Module):
     """
     Small 1D CNN for temporal sign classification.
 
-    Input shape:  (batch, in_channels, 10)   — features as channels, frames as time
+    Input shape:  (batch, in_channels, 10), features as channels, frames as time
     Output shape: (batch, num_classes)
 
     Architecture:
-        Conv1D(in_ch, 32, k=3, pad=1) → BN → ReLU → Dropout
-        Conv1D(32, 64, k=3, pad=1)    → BN → ReLU → Dropout
-        Conv1D(64, 64, k=3, pad=1)    → BN → ReLU → Dropout
-        Global Average Pooling         → collapses time dim
+        Conv1D(in_ch, 32, k=3, pad=1) to BN to ReLU to Dropout
+        Conv1D(32, 64, k=3, pad=1) to BN to ReLU to Dropout
+        Conv1D(64, 64, k=3, pad=1) to BN to ReLU to Dropout
+        Global Average Pooling to collapses time dim
         Linear(64, num_classes)
     """
 
