@@ -141,6 +141,12 @@ class CorpusFeatureGenerator:
         
         corpuses = [
             {
+                'name': 'v0_raw_coordinates_84',
+                'method': 'extract_feature_set_0_raw_coordinates',
+                'features': 840,
+                'description': 'Raw X and Y coordinates for each point'
+            },
+            {
                 'name': 'v1_all_proximity_and_angles_9090',
                 'method': 'extract_feature_set_1_combined',
                 'features': 9090,
@@ -153,15 +159,15 @@ class CorpusFeatureGenerator:
                 'description': 'Only proximity features'
             },
             {
-                'name': 'v3_tips_palms_with_angles_mixed',
+                'name': 'v3_tips_palms_with_angles_mixed_1140',
                 'method': 'extract_feature_set_3_tips_and_palms_with_angles',
-                'features': 'mixed',
+                'features': 1140,
                 'description': 'Fingertips + palms distances + angles'
             },
             {
-                'name': 'v4_12points_angles_and_distances_mixed',
+                'name': 'v4_12points_angles_and_distance_850',
                 'method': 'extract_feature_set_4_tips_and_palms_with_angles',
-                'features': 'mixed',
+                'features': 850,
                 'description': '12-point angles and distances only'
             },
             {
@@ -171,10 +177,16 @@ class CorpusFeatureGenerator:
                 'description': '12-point distances only (no angles)'
             },
             {
-                'name': 'v6_minimal_index_palm_pinkie_1630',
+                'name': 'v6_minimal_index_palm_pinkie_850',
                 'method': 'extract_feature_set_6_extreme_minimal',
-                'features': 1630,
+                'features': 850,
                 'description': 'Minimal: index, palm, pinkie distances'
+            },
+            {
+                'name': 'v7_interhand_distances_only_360',
+                'method': 'extract_feature_set_7_interhand_distances_only',
+                'features': 360,
+                'description': 'Inter-hand distances only (no intra-hand distances)'
             }
         ]
         

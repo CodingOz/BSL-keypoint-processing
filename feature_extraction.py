@@ -410,6 +410,79 @@ class FeatureExraction:
             features.append(frame_features)
         
         return features
+    
+    def extract_feature_set_0_raw_coordinates(self, json_obj):
+        '''Feature Set 0:
+        Raw X and Y coordinates for each point.
+        21 landmarks per hand × 2 hands × 2 coordinates = 84 features per frame.
+        '''
+        frames = json_obj['frames']
+        features = []
+        
+        for frame in frames:
+            frame_features = []
+            
+            left_landmarks = None
+            right_landmarks = None
+            
+            if 'hands' in frame:
+                if 'left' in frame['hands'] and frame['hands']['left']:
+                    left_landmarks = [[lm['x'], lm['y']] for lm in frame['hands']['left']]
+                if 'right' in frame['hands'] and frame['hands']['right']:
+                    right_landmarks = [[lm['x'], lm['y']] for lm in frame['hands']['right']]
+            
+            # Add left hand coordinates
+            if left_landmarks is not None:
+                for coord in left_landmarks:
+                    frame_features.extend([float(coord[0]), float(coord[1])])
+            else:
+                frame_features.extend([0.0] * 42)  # 21 points × 2 coordinates
+            
+            # Add right hand coordinates
+            if right_landmarks is not None:
+                for coord in right_landmarks:
+                    frame_features.extend([float(coord[0]), float(coord[1])])
+            else:
+                frame_features.extend([0.0] * 42)  # 21 points × 2 coordinates
+            
+            features.append(frame_features)
+        
+        return features
+    
+    def extract_feature_set_7_interhand_distances_only(self, json_obj):
+        '''Feature Set 7:
+        Inter-hand distances only (no intra-hand distances).
+        Uses 12 key points: wrist(0) and fingertips(4,8,12,16,20) per hand.
+        6 × 6 = 36 inter-hand distance features per frame.
+        '''
+        frames = json_obj['frames']
+        key_indices = [0, 4, 8, 12, 16, 20]
+        features = []
+        
+        for frame in frames:
+            frame_features = []
+            
+            left_landmarks = None
+            right_landmarks = None
+            
+            if 'hands' in frame:
+                if 'left' in frame['hands'] and frame['hands']['left']:
+                    left_landmarks = np.array([[lm['x'], lm['y']] 
+                                              for lm in frame['hands']['left']])
+                if 'right' in frame['hands'] and frame['hands']['right']:
+                    right_landmarks = np.array([[lm['x'], lm['y']] 
+                                               for lm in frame['hands']['right']])
+            
+            if left_landmarks is not None and right_landmarks is not None:
+                # All pairs between left and right hands (inter-hand distances only)
+                for idx1 in key_indices:
+                    for idx2 in key_indices:
+                        dist = np.linalg.norm(left_landmarks[idx1] - right_landmarks[idx2])
+                        frame_features.append(float(dist))
+            
+            features.append(frame_features)
+        
+        return features
                 
     def extract_all_proximity_features(self):
         self.features = []
@@ -463,6 +536,20 @@ class FeatureExraction:
         features = []
         for json_obj in self.corpus:
             features.append(self.extract_feature_set_6_extreme_minimal(json_obj))
+        return features
+    
+    def extract_all_feature_set_0(self):
+        '''Batch extract Feature Set 0 (Raw Coordinates): 84 inputs per sample.'''
+        features = []
+        for json_obj in self.corpus:
+            features.append(self.extract_feature_set_0_raw_coordinates(json_obj))
+        return features
+    
+    def extract_all_feature_set_7(self):
+        '''Batch extract Feature Set 7 (Inter-hand distances only): 144 inputs per sample.'''
+        features = []
+        for json_obj in self.corpus:
+            features.append(self.extract_feature_set_7_interhand_distances_only(json_obj))
         return features
     
     
