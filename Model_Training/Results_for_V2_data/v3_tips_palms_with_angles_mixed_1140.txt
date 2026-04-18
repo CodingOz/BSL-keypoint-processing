@@ -1,0 +1,98 @@
+Corpus: v3_tips_palms_with_angles_mixed_1140
+Samples: 327  |  Frames: 10  |  Features/frame: 114  |  Classes: 11
+Class distribution: {'A': 30, 'B': 31, 'E': 33, 'I': 35, 'J': 31, 'N': 29, 'O': 33, 'P': 32, 'S': 25, 'T': 22, 'U': 26}
+Model input shape: (batch, 114, 10)
+Augmentation: ON
+======================================================================
+
+────────────────────────────── Fold 1/5 ──────────────────────────────
+Train: 261 samples  |  Val: 66 samples
+  Epoch   1  train_loss=2.1630  train_acc=0.287  val_loss=1.9041  val_acc=0.621
+  Epoch  25  train_loss=0.2923  train_acc=0.931  val_loss=0.2804  val_acc=0.939
+  Early stop at epoch 49  (best val_loss=0.2126)
+
+  Fold 1 result: val_acc = 0.924
+
+────────────────────────────── Fold 2/5 ──────────────────────────────
+Train: 261 samples  |  Val: 66 samples
+  Epoch   1  train_loss=2.1981  train_acc=0.291  val_loss=1.9091  val_acc=0.652
+  Epoch  25  train_loss=0.2776  train_acc=0.939  val_loss=0.2338  val_acc=0.924
+  Epoch  50  train_loss=0.1430  train_acc=0.977  val_loss=0.1833  val_acc=0.939
+  Early stop at epoch 63  (best val_loss=0.1635)
+
+  Fold 2 result: val_acc = 0.924
+
+────────────────────────────── Fold 3/5 ──────────────────────────────
+Train: 262 samples  |  Val: 65 samples
+  Epoch   1  train_loss=2.1896  train_acc=0.256  val_loss=1.9381  val_acc=0.554
+  Epoch  25  train_loss=0.2826  train_acc=0.939  val_loss=0.2204  val_acc=0.938
+  Epoch  50  train_loss=0.1898  train_acc=0.954  val_loss=0.1536  val_acc=0.954
+  Early stop at epoch 58  (best val_loss=0.1265)
+
+  Fold 3 result: val_acc = 0.985
+
+────────────────────────────── Fold 4/5 ──────────────────────────────
+Train: 262 samples  |  Val: 65 samples
+  Epoch   1  train_loss=2.2021  train_acc=0.214  val_loss=1.9116  val_acc=0.708
+  Epoch  25  train_loss=0.2448  train_acc=0.950  val_loss=0.1498  val_acc=0.954
+  Epoch  50  train_loss=0.2237  train_acc=0.927  val_loss=0.0965  val_acc=0.969
+  Epoch  75  train_loss=0.0852  train_acc=0.992  val_loss=0.1041  val_acc=0.954
+  Early stop at epoch 75  (best val_loss=0.0758)
+
+  Fold 4 result: val_acc = 0.969
+
+────────────────────────────── Fold 5/5 ──────────────────────────────
+Train: 262 samples  |  Val: 65 samples
+  Epoch   1  train_loss=2.1902  train_acc=0.233  val_loss=1.9073  val_acc=0.508
+  Epoch  25  train_loss=0.3001  train_acc=0.916  val_loss=0.2764  val_acc=0.938
+  Epoch  50  train_loss=0.1912  train_acc=0.958  val_loss=0.2525  val_acc=0.938
+  Early stop at epoch 64  (best val_loss=0.2107)
+
+  Fold 5 result: val_acc = 0.954
+
+======================================================================
+CROSS-VALIDATION RESULTS
+======================================================================
+  Fold 1: acc=0.924  stopped_epoch=49  best_val_loss=0.2126
+  Fold 2: acc=0.924  stopped_epoch=63  best_val_loss=0.1635
+  Fold 3: acc=0.985  stopped_epoch=58  best_val_loss=0.1265
+  Fold 4: acc=0.969  stopped_epoch=75  best_val_loss=0.0758
+  Fold 5: acc=0.954  stopped_epoch=64  best_val_loss=0.2107
+
+  Mean accuracy: 0.951 ± 0.024
+  Min: 0.924  Max: 0.985
+
+──────────────────────────────────────────────────────────────────────
+PER-CLASS REPORT (aggregated across all folds)
+──────────────────────────────────────────────────────────────────────
+              precision    recall  f1-score   support
+
+           A      1.000     1.000     1.000        30
+           B      0.969     1.000     0.984        31
+           E      0.941     0.970     0.955        33
+           I      0.914     0.914     0.914        35
+           J      0.938     0.968     0.952        31
+           N      0.935     1.000     0.967        29
+           O      0.938     0.909     0.923        33
+           P      0.938     0.938     0.938        32
+           S      1.000     1.000     1.000        25
+           T      1.000     0.909     0.952        22
+           U      0.917     0.846     0.880        26
+
+    accuracy                          0.951       327
+   macro avg      0.954     0.950     0.951       327
+weighted avg      0.951     0.951     0.951       327
+
+Confusion Matrix:
+        A    B    E    I    J    N    O    P    S    T    U
+    A   30    0    0    0    0    0    0    0    0    0    0
+    B    0   31    0    0    0    0    0    0    0    0    0
+    E    0    0   32    1    0    0    0    0    0    0    0
+    I    0    0    2   32    0    0    1    0    0    0    0
+    J    0    0    0    1   30    0    0    0    0    0    0
+    N    0    0    0    0    0   29    0    0    0    0    0
+    O    0    0    0    0    1    0   30    0    0    0    2
+    P    0    1    0    1    0    0    0   30    0    0    0
+    S    0    0    0    0    0    0    0    0   25    0    0
+    T    0    0    0    0    1    1    0    0    0   20    0
+    U    0    0    0    0    0    1    1    2    0    0   22

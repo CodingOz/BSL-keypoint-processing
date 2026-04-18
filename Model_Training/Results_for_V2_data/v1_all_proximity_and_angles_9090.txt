@@ -1,0 +1,97 @@
+Corpus: v1_all_proximity_and_angles_9090
+Samples: 327  |  Frames: 10  |  Features/frame: 909  |  Classes: 11
+Class distribution: {'A': 30, 'B': 31, 'E': 33, 'I': 35, 'J': 31, 'N': 29, 'O': 33, 'P': 32, 'S': 25, 'T': 22, 'U': 26}
+Model input shape: (batch, 909, 10)
+Augmentation: ON
+======================================================================
+
+────────────────────────────── Fold 1/5 ──────────────────────────────
+Train: 261 samples  |  Val: 66 samples
+  Epoch   1  train_loss=2.1624  train_acc=0.238  val_loss=1.7795  val_acc=0.455
+  Epoch  25  train_loss=0.3132  train_acc=0.927  val_loss=0.3623  val_acc=0.879
+  Epoch  50  train_loss=0.1452  train_acc=0.962  val_loss=0.3043  val_acc=0.909
+  Early stop at epoch 68  (best val_loss=0.2622)
+
+  Fold 1 result: val_acc = 0.909
+
+────────────────────────────── Fold 2/5 ──────────────────────────────
+Train: 261 samples  |  Val: 66 samples
+  Epoch   1  train_loss=2.1741  train_acc=0.291  val_loss=1.8568  val_acc=0.576
+  Epoch  25  train_loss=0.3959  train_acc=0.904  val_loss=0.3341  val_acc=0.879
+  Epoch  50  train_loss=0.1808  train_acc=0.962  val_loss=0.2150  val_acc=0.924
+  Early stop at epoch 68  (best val_loss=0.1731)
+
+  Fold 2 result: val_acc = 0.939
+
+────────────────────────────── Fold 3/5 ──────────────────────────────
+Train: 262 samples  |  Val: 65 samples
+  Epoch   1  train_loss=2.1465  train_acc=0.294  val_loss=1.8263  val_acc=0.600
+  Epoch  25  train_loss=0.4132  train_acc=0.885  val_loss=0.2760  val_acc=0.908
+  Epoch  50  train_loss=0.1785  train_acc=0.947  val_loss=0.2548  val_acc=0.923
+  Early stop at epoch 57  (best val_loss=0.1996)
+
+  Fold 3 result: val_acc = 0.923
+
+────────────────────────────── Fold 4/5 ──────────────────────────────
+Train: 262 samples  |  Val: 65 samples
+  Epoch   1  train_loss=2.1725  train_acc=0.286  val_loss=1.7850  val_acc=0.554
+  Epoch  25  train_loss=0.3255  train_acc=0.931  val_loss=0.1474  val_acc=0.969
+  Epoch  50  train_loss=0.2283  train_acc=0.935  val_loss=0.1035  val_acc=0.954
+  Early stop at epoch 57  (best val_loss=0.0721)
+
+  Fold 4 result: val_acc = 0.985
+
+────────────────────────────── Fold 5/5 ──────────────────────────────
+Train: 262 samples  |  Val: 65 samples
+  Epoch   1  train_loss=2.1144  train_acc=0.298  val_loss=1.6644  val_acc=0.585
+  Epoch  25  train_loss=0.3085  train_acc=0.931  val_loss=0.2108  val_acc=0.908
+  Early stop at epoch 44  (best val_loss=0.1908)
+
+  Fold 5 result: val_acc = 0.985
+
+======================================================================
+CROSS-VALIDATION RESULTS
+======================================================================
+  Fold 1: acc=0.909  stopped_epoch=68  best_val_loss=0.2622
+  Fold 2: acc=0.939  stopped_epoch=68  best_val_loss=0.1731
+  Fold 3: acc=0.923  stopped_epoch=57  best_val_loss=0.1996
+  Fold 4: acc=0.985  stopped_epoch=57  best_val_loss=0.0721
+  Fold 5: acc=0.985  stopped_epoch=44  best_val_loss=0.1908
+
+  Mean accuracy: 0.948 ± 0.031
+  Min: 0.909  Max: 0.985
+
+──────────────────────────────────────────────────────────────────────
+PER-CLASS REPORT (aggregated across all folds)
+──────────────────────────────────────────────────────────────────────
+              precision    recall  f1-score   support
+
+           A      1.000     0.967     0.983        30
+           B      0.969     1.000     0.984        31
+           E      0.914     0.970     0.941        33
+           I      0.939     0.886     0.912        35
+           J      0.909     0.968     0.938        31
+           N      1.000     1.000     1.000        29
+           O      0.833     0.909     0.870        33
+           P      1.000     0.969     0.984        32
+           S      1.000     1.000     1.000        25
+           T      0.955     0.955     0.955        22
+           U      0.955     0.808     0.875        26
+
+    accuracy                          0.948       327
+   macro avg      0.952     0.948     0.949       327
+weighted avg      0.950     0.948     0.948       327
+
+Confusion Matrix:
+        A    B    E    I    J    N    O    P    S    T    U
+    A   29    0    0    0    1    0    0    0    0    0    0
+    B    0   31    0    0    0    0    0    0    0    0    0
+    E    0    0   32    1    0    0    0    0    0    0    0
+    I    0    0    2   31    0    0    2    0    0    0    0
+    J    0    0    1    0   30    0    0    0    0    0    0
+    N    0    0    0    0    0   29    0    0    0    0    0
+    O    0    0    0    1    1    0   30    0    0    0    1
+    P    0    1    0    0    0    0    0   31    0    0    0
+    S    0    0    0    0    0    0    0    0   25    0    0
+    T    0    0    0    0    1    0    0    0    0   21    0
+    U    0    0    0    0    0    0    4    0    0    1   21
