@@ -1,20 +1,20 @@
 import json
 from copy import deepcopy
 from turtle import left
-from Validators.keypoint_validator import CubicSplineKeyPointInterpolator, Sigh_lenths
+from Validators.keypoint_validator import CubicSplineKeyPointInterpolator, SignLengths
 from pathlib import Path
 
 class KeypointInterpolator:
     ''' manages the the interpolation of keypoints'''
 
-    def SimpleCubicSplineKeyPointGenerator(self, json_path, show_logs=False):
+    def simpleCubicSplineKeyPointGenerator(self, json_path, show_logs=False):
         '''interpolates all keypoints of the '''
         with open(json_path, 'r') as f:
             json_data = json.load(f)
 
         interpolator = CubicSplineKeyPointInterpolator(json_path)
         frames  = json_data['frames']
-        lenths  = interpolator.getSignLenths()
+        lenths  = interpolator.getSignLengths()
 
         # fill both hands across the full signing region
         first = lenths.first_hand
@@ -61,8 +61,8 @@ class KeypointInterpolator:
 
         return json_data
 
-    def SimpleCubicSplineCorpusGenerator(self, source_corpus, target_corpus):
-        '''Uses SimpleCubicSplineKeyPointGenerator to generate a new corpus of interpolated keypoints.
+    def simpleCubicSplineCorpusGenerator(self, source_corpus, target_corpus):
+        '''Uses simpleCubicSplineKeyPointGenerator to generate a new corpus of interpolated keypoints.
         takes:
             source_corpus: the path to the corpus of uninterpolated keypoints
             target_corpus: the location where the interpolated keypoints are to be generated to
@@ -81,7 +81,7 @@ class KeypointInterpolator:
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
             try:
-                interpolated = self.SimpleCubicSplineKeyPointGenerator(str(json_path))
+                interpolated = self.simpleCubicSplineKeyPointGenerator(str(json_path))
 
                 with open(output_path, 'w', encoding='utf-8') as f:
                     json.dump(interpolated, f, indent=2)
@@ -107,7 +107,7 @@ class KeypointInterpolator:
             json_data = json.load(f)
         frames  = json_data['frames']
         validator = CubicSplineKeyPointInterpolator(json_path)
-        lenths = validator.getSignLenths()
+        lenths = validator.getSignLengths()
         
         # looks at does the start first 
         gap = lenths.first_with_both - lenths.first_hand

@@ -5,11 +5,11 @@ import shutil
 import subprocess
 
 # manages all checks related to keypoint orientation
-class orientation_checker:
+class OrientationChecker:
 
     # Extracts rotation metadata from video file using ffprobe.
     # Returns angle needed to return it to original
-    def get_rotation_metadata(self, filename):
+    def getRotationMetadata(self, filename):
         try:
             cmd = [
                 'ffprobe', '-v', 'quiet', '-print_format', 'json',
@@ -43,7 +43,7 @@ class orientation_checker:
             return 0
 
     # finds the percentage of frames point_a set is right/above point_b set
-    def get_offset(self, start_frame, end_frame, json_data):
+    def getOffset(self, start_frame, end_frame, json_data):
         right_count = 0
         above_count = 0
         right_distance = 0
@@ -86,7 +86,7 @@ class orientation_checker:
 
     # estimates the orientation based on the relitive position of the 2 hand clusters
     # designed for symmetric signs like 'B' or 'or'
-    def check_hand_orientation(self, json_path):
+    def checkHandOrientation(self, json_path):
         with open(json_path, "r") as f:
             json_data = json.load(f)
         
@@ -98,7 +98,7 @@ class orientation_checker:
         
         # finds the percentage of points on the left hand 
         # that is right of / above of the right hand
-        x_percentage, y_percentage, x_distance, y_distance = self.get_offset(start_frame, 
+        x_percentage, y_percentage, x_distance, y_distance = self.getOffset(start_frame, 
                                                                              end_frame, 
                                                                              json_data)
         
@@ -149,7 +149,7 @@ class orientation_checker:
     #Rotate all pose and hand  points in the JSON file around based on center (0.5, 0.5)
     # ignores `z` and `visibility` fields
     @staticmethod
-    def rotate_points(json_path, target_path, angle, center=(0.5, 0.5)):
+    def rotatePoints(json_path, target_path, angle, center=(0.5, 0.5)):
         with open(json_path, "r", encoding="utf-8") as f:
             json_data = json.load(f)
 
@@ -188,7 +188,7 @@ class orientation_checker:
             json.dump(json_data, out_f, ensure_ascii=False, indent=2)
         
     # checks orientation of all keypoints in file
-    def fix_rotations(self, folder_path, target_path):
+    def fixRotations(self, folder_path, target_path):
         os.makedirs(target_path, exist_ok=True)
 
         for root, _, files in os.walk(folder_path):
@@ -203,9 +203,9 @@ class orientation_checker:
                     continue
 
                 try:
-                    detected = self.check_hand_orientation(src_path)
+                    detected = self.checkHandOrientation(src_path)
                 except Exception as e:
-                    print(f"[fix_rotations] could not determine orientation for {rel_path}: {e}")
+                    print(f"[fixRotations] could not determine orientation for {rel_path}: {e}")
                     shutil.copy2(src_path, dst_path)
                     continue
 
@@ -216,7 +216,7 @@ class orientation_checker:
                 else:
                     try:
                         # rotate and write to destination
-                        self.rotate_points(src_path, dst_path, rotate_by)
+                        self.rotatePoints(src_path, dst_path, rotate_by)
                     except Exception as e:
                         print(f"[fix_rotations] failed to rotate {rel_path}: {e}")
                         shutil.copy2(src_path, dst_path)

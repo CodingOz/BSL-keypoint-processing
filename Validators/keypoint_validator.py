@@ -23,7 +23,7 @@ from scipy.interpolate import CubicSpline, interp1d
 from dataclasses import dataclass
 
 @ dataclass
-class Sigh_lenths:
+class SignLengths:
     filepath: str
     
     # total frames 
@@ -46,7 +46,7 @@ class Sigh_lenths:
     length_with_both: int
     
     # nunber of frames between the first and last point a band was seen
-    lenth_with_hands: int
+    length_with_hands: int
     
     
 class KeyPointValidator:
@@ -186,7 +186,7 @@ class KeyPointValidator:
         if palms2['left'] != [None, None] and palms['left'] != [None, None]:
             leftDx = palms2['left'][0] - palms['left'][0]  # X is index 0
             leftDy = palms2['left'][1] - palms['left'][1]  # Y is index 1
-            leftDirX, leftDirY, leftMag = normalize_vector(leftDx, leftDy)
+            leftDirX, leftDirY, leftMag = normalizeVector(leftDx, leftDy)
             estL = False 
         else:
             leftDirX, leftDirY, leftMag = 0, 0, 0
@@ -196,7 +196,7 @@ class KeyPointValidator:
         if palms2['right'] != [None, None] and palms['right'] != [None, None]:
             rightDx = palms2['right'][0] - palms['right'][0]
             rightDy = palms2['right'][1] - palms['right'][1]
-            rightDirX, rightDirY, rightMag = normalize_vector(rightDx, rightDy)
+            rightDirX, rightDirY, rightMag = normalizeVector(rightDx, rightDy)
             estR = False 
         else:
             estR = True 
@@ -274,10 +274,10 @@ class KeyPointValidator:
                 # Acceleration: change in velocity
                 accel_x = v2_dir[0] * v2Mag - v1_dir[0] * v1Mag
                 accel_y = v2_dir[1] * v2Mag - v1_dir[1] * v1Mag
-                acceleration = vector_magnitude((accel_x, accel_y))
+                acceleration = vectorMagnitude((accel_x, accel_y))
                 
                 # Angular deviation: pure directional change
-                angular_deviation = angle_between_vectors(v1_dir, v2_dir)
+                angular_deviation = angleBetweenVectors(v1_dir, v2_dir)
                 
                 # Magnitude change
                 magnitude_change = v2Mag - v1Mag
@@ -336,8 +336,8 @@ class KeyPointValidator:
         right = math.hypot(rx2 - rx1, ry2 - ry1) 
         return [left, right]
 
-    def getSignLenths(self):
-        ''' return a Sigh_lenths object with filled values
+    def getSignLengths(self):
+        ''' return a SignLengths object with filled values
         
         '''
         
@@ -404,7 +404,7 @@ class KeyPointValidator:
         if last_with_both is None:
             last_with_both = 0
         
-        return Sigh_lenths(
+        return SignLengths(
             filepath=self.filepath,
             total_frames=total_frames,
             first_hand=first_hand,
@@ -1087,7 +1087,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         if self.__filled_palms is None:
             self.getFilledPalmCenters()
 
-        lenths = self.getSignLenths()
+        lenths = self.getSignLengths()
         start  = lenths.first_hand
         end    = lenths.last_hand
 
@@ -1228,7 +1228,7 @@ class CubicSplineKeyPointInterpolator(KeyPointValidator):
         self.__hand_distances = distances
         return distances
     
-    def find_closest_distances(self):
+    def findClosestDistances(self):
         """
         Finds the closest pair of keypoints (one from left hand, one from right hand)
         in each frame and returns their distances.

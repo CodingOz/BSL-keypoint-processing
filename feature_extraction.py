@@ -1,7 +1,7 @@
 import numpy as np
 import json
 
-class FeatureExraction:
+class FeatureExtraction:
     def __init__(self, corpus_path, feature_path):
         self.corpus_path = corpus_path
         self.feature_path = feature_path
@@ -10,12 +10,12 @@ class FeatureExraction:
         self.corpus = []
         self.load_corpus()
     
-    def load_corpus(self):
+    def loadCorpus(self):
         with open(self.corpus_path, 'r') as f:
             for line in f:
                 self.corpus.append(json.loads(line))
                 
-    def extract_proximity_features(self, json_obj, include_labels=False, include_palms=False):
+    def extractProximityFeatures(self, json_obj, include_labels=False, include_palms=False):
         '''Extract proximity features from a single JSON object.
         there are C(2, 42) = 861 pairs of proximitys per frame,
         C(2, 44) = 946 pairs of proximitys per frame if include_palms is True,
@@ -58,7 +58,7 @@ class FeatureExraction:
         
         return np.array(proximity_features, dtype=object) if include_labels else np.array(proximity_features) 
     
-    def extract_angle_features(self, json_obj, include_labels=False):
+    def extractAngleFeatures(self, json_obj, include_labels=False):
         '''Extract angle features from hand landmarks.
         Calculates joint angles within each hand and inter-hand angles.
         
@@ -152,7 +152,7 @@ class FeatureExraction:
         return np.array(angle_features)
     
     @staticmethod
-    def _calculate_angle(p1, vertex, p2):
+    def _calculateAngle(p1, vertex, p2):
         '''Calculate angle at vertex between vectors (p1->vertex) and (vertex->p2).
         
         Returns angle in radians.
@@ -484,13 +484,13 @@ class FeatureExraction:
         
         return features
                 
-    def extract_all_proximity_features(self):
+    def extractAllProximityFeatures(self):
         self.features = []
         for json_obj in self.corpus:
             self.features.append(self.extract_proximity_features(json_obj))
         return self.features
     
-    def extract_all_angle_features(self):
+    def extractAllAngleFeatures(self):
         features = []
         for json_obj in self.corpus:
             features.append(self.extract_angle_features(json_obj))

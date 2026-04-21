@@ -13,14 +13,34 @@ Talisman(
         'frame-src': "https://www.youtube-nocookie.com",
         'script-src': [
             "'self'",
+            "'unsafe-inline'",
+            "'wasm-unsafe-eval'",
             "https://code.jquery.com",
             "https://cdnjs.cloudflare.com",
-            "https://stackpath.bootstrapcdn.com"
+            "https://stackpath.bootstrapcdn.com",
+            "https://cdn.jsdelivr.net",
         ],
         'style-src': [
             "'self'",
             "'unsafe-inline'",
-            "https://stackpath.bootstrapcdn.com"
+            "https://stackpath.bootstrapcdn.com",
+        ],
+        'media-src': [
+            "'self'",
+            "blob:",
+        ],
+        'worker-src': [
+            "'self'",
+            "blob:",
+            "https://cdn.jsdelivr.net",
+        ],
+        'connect-src': [
+            "'self'",
+            "blob:",
+            "https://cdn.jsdelivr.net",
+            "https://storage.googleapis.com",
+            "https://cdnjs.cloudflare.com",
+            "https://stackpath.bootstrapcdn.com",
         ],
     }
 )
@@ -30,3 +50,6 @@ def jinja_getattr(obj, attr):
     return getattr(obj, attr)
 
 from app import views
+from flask_wtf.csrf import CSRFProtect
+csrf = CSRFProtect(app)
+csrf.exempt(views.submit)

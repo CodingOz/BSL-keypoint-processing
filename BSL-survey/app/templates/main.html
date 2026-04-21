@@ -25,7 +25,7 @@
          basic signs.</p>
 
       <div class="privacy-notice">
-        <h3>🔒 Your Privacy is Protected</h3>
+        <h3>Your Privacy is Protected</h3>
         <p>Your videos <strong>never leave your device</strong>. Hand-keypoint coordinates are
            extracted directly in your browser using on-device AI, and only those coordinates
            are sent to the server. The original video is permanently discarded without
@@ -51,15 +51,11 @@
     </div>
   </div>
 
-  <div class="form-card">
-    <h2 class="form-title">Record Your BSL Signs</h2>
+  <!-- FIX 1: Only one <form> tag, with id and novalidate -->
+  <form id="survey-form" novalidate>
+    <div class="form-card">
+      <h2 class="form-title">Record Your BSL Signs</h2>
 
-    <!--
-      No method/action — submission is handled entirely by JS.
-      The CSRF token is still included so Flask-WTF keeps working
-      if you ever re-add server-side processing.
-    -->
-    <form id="survey-form" novalidate>
       {{ form.hidden_tag() }}
 
       <div class="video-grid">
@@ -67,111 +63,84 @@
           {% set field_name = 'video_' ~ letter %}
           {% set field = form | getattr(field_name) %}
 
-          <div class="video-upload-item" id="slot-{{ letter }}">
+          <div class="video-upload-item">
             <div class="upload-label">
               {{ field.label }}
               <span class="sign-badge">{{ letter }}</span>
             </div>
 
             <div class="tutorial-video-wrapper">
-              <iframe src="{{ video_tutorials[letter] }}"
-                      loading="lazy" allowfullscreen></iframe>
+              <iframe src="{{ video_tutorials[letter] }}" loading="lazy" allowfullscreen></iframe>
               <p class="video-caption">Watch tutorial for "{{ letter }}"</p>
             </div>
 
             <div class="upload-wrapper">
-              <!--
-                data-slot and data-sign are read by ExtractionQueue.js
-                to identify which sign this input belongs to.
-              -->
-              <input type="file"
-                     id="field-{{ letter }}"
-                     class="form-control-file custom-file-input"
-                     accept="video/*"
-                     capture="user"
-                     data-slot="{{ letter }}"
-                     data-sign="{{ letter }}">
-              <span class="file-chosen" id="filename-{{ letter }}">No file chosen</span>
+              {{ field(id="video_" ~ letter, class="form-control-file custom-file-input", accept="video/*", capture="user") }}
+              <span id="filename-{{ letter }}" class="file-chosen">No file chosen</span>
             </div>
 
-            <!-- Per-slot extraction status indicator -->
-            <div class="extraction-status" id="status-{{ letter }}" aria-live="polite">
-              <span class="status-icon" id="status-icon-{{ letter }}"></span>
-              <span class="status-text" id="status-text-{{ letter }}">Waiting for video…</span>
-              <progress class="extraction-progress"
-                        id="progress-{{ letter }}"
-                        value="0" max="100"
-                        style="display:none"></progress>
+            <div class="extraction-status" id="status-{{ letter }}">
+              <span id="status-icon-{{ letter }}"></span>
+              <span id="status-text-{{ letter }}">Waiting for video…</span>
+              <progress id="progress-{{ letter }}" value="0" max="100" style="display:none;"></progress>
             </div>
           </div>
         {% endfor %}
-
-        <!-- Consent section (unchanged from original) -->
-        <div class="consent-section">
-          <h3 class="consent-title">Consent Agreement</h3>
-          <p class="consent-intro">Please read and agree to the following before submitting:</p>
-          <div class="consent-checkbox-group">
-            <div class="consent-item">
-              {{ form.consent_video_deletion(id="consent1") }}
-              {{ form.consent_video_deletion.label }}
-            </div>
-            <div class="consent-item">
-              {{ form.consent_data_usage(id="consent2") }}
-              {{ form.consent_data_usage.label }}
-            </div>
-          </div>
-          <div id="consent-error" class="error-message" style="display:none">
-            Please agree to both consent statements to proceed.
-          </div>
-        </div>
       </div><!-- /.video-grid -->
 
-      <!-- Overall readiness summary -->
       <div id="readiness-bar" class="readiness-bar" aria-live="polite">
         <span id="readiness-text">0 / {{ letters|length }} videos ready</span>
       </div>
 
-      <div class="submit-wrapper">
-        <button type="submit" id="submit-btn"
-                class="btn btn-primary btn-lg submit-btn">
-          Submit
-        </button>
-        <p id="form-message" class="form-message" aria-live="assertive"></p>
+      <div class="consent-section">
+        <h3 class="consent-title">Consent Agreement</h3>
+        <p class="consent-intro">Please read and agree to the following before submitting:</p>
+        <div class="consent-checkbox-group">
+          <div class="consent-item">
+            {{ form.consent_video_deletion(id="consent_video_deletion") }}
+            {{ form.consent_video_deletion.label }}
+          </div>
+          <div class="consent-item">
+            {{ form.consent_data_usage(id="consent_data_usage") }}
+            {{ form.consent_data_usage.label }}
+          </div>
+        </div>
+        <div id="consent-error" class="error-message" style="display:none;">
+          Please agree to both consent statements to proceed.
+        </div>
       </div>
-    </form>
 
-    <!-- Loading overlay shown while POST is in flight -->
-    <div id="loading-overlay" style="display:none">
+      <div id="form-message" class="alert alert-danger" style="display:none;"></div>
+
+      <div class="submit-wrapper">
+        {{ form.submit(id="submit-btn", class="btn btn-primary btn-lg submit-btn") }}
+        <p>This may take a few minutes after submission. Please don't close the page until the success message appears.</p>
+      </div>
+
+    </div><!-- /.form-card -->
+
+    <div id="loading-overlay" style="display:none;">
       <div class="loading-content">
         <div class="spinner-border text-primary" role="status"></div>
         <p id="loading-message">Submitting keypoints…</p>
       </div>
     </div>
-  </div>
+
+  </form><!-- /#survey-form -->
 
   <footer class="survey-footer">
     <p>Questions? Contact me at sc23os@leeds.ac.uk</p>
-    <p class="small-text">This survey is part of a university research project.</p>
   </footer>
 
-</div><!-- /.container -->
+</div>
 
-<!-- Bootstrap JS (unchanged) -->
+<script>
+  window.BSL_LETTERS = {{ letters | tojson }};
+  window.CLOUDFLARE_WORKER_URL = "/submit";
+</script>
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.6/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/js/bootstrap.min.js"></script>
-
-<!--
-  Pass the sign list from Flask to JS as a JSON array.
-  Jinja's tojson filter handles escaping safely.
--->
-<script>
-  window.BSL_LETTERS = {{ letters | tojson }};
-  window.CLOUDFLARE_WORKER_URL = "https://your-worker.workers.dev/submit";
-</script>
-
-<!-- The survey integration script — see survey-integration.js below -->
 <script type="module" src="{{ url_for('static', filename='js/survey-integration.js') }}"></script>
-
 </body>
 </html>

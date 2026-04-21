@@ -1,7 +1,7 @@
 import json
 from copy import deepcopy
 from turtle import left
-from Validators.keypoint_validator import CubicSplineKeyPointInterpolator, Sigh_lenths
+from Validators.keypoint_validator import CubicSplineKeyPointInterpolator, SignLengths
 from pathlib import Path
 
 class KeypointInterpolator:
@@ -14,7 +14,7 @@ class KeypointInterpolator:
 
         interpolator = CubicSplineKeyPointInterpolator(json_path)
         frames  = json_data['frames']
-        lenths  = interpolator.getSignLenths()
+        lenths  = interpolator.getSignLengths()
 
         # fill both hands across the full signing region
         first = lenths.first_hand
@@ -107,7 +107,7 @@ class KeypointInterpolator:
             json_data = json.load(f)
         frames  = json_data['frames']
         validator = CubicSplineKeyPointInterpolator(json_path)
-        lenths = validator.getSignLenths()
+        lenths = validator.getSignLengths()
         
         # looks at does the start first 
         gap = lenths.first_with_both - lenths.first_hand

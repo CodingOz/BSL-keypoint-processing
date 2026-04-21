@@ -118,11 +118,11 @@ class RunDetectionTests:
     # Registry of detection strategies.
     # Each entry: method_name -> callable(detector, **params) -> (left_flags, right_flags)
     METHODS: dict[str, Callable] = {
-        'movement_only': lambda det, **p: det.movementAnomalys(**p),
+        'movement_only': lambda det, **p: det.movementAnomalies(**p),
 
-        'position_only': lambda det, **p: det.posisionAnomalys(**p),
+        'position_only': lambda det, **p: det.positionAnomalies(**p),
 
-        'filled_movement': lambda det, **p: det.filledMovementAnomalys(**p),
+        'filled_movement': lambda det, **p: det.filledMovementAnomalies(**p),
         
         'ordering_palm_center_neighbour': lambda det, **p: (
             det.handOrderingAnomalysByPalmCenterUsingNeighbourFilling(**p)

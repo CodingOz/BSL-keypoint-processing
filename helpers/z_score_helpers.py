@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def zscore_normalize(data):
+def zscoreNormalize(data):
     """
     Z-score normalization: (x - mean) / std
     makes data dimensionless with mean=0, std=1
@@ -22,7 +22,7 @@ def zscore_normalize(data):
     return (data_array - mean) / std
 
 
-def minmax_normalize(data):
+def minmaxNormalize(data):
     """
     Min-max normalization: (x - min) / (max - min)
     scales data to range [0, 1]
@@ -42,7 +42,7 @@ def minmax_normalize(data):
     return (data_array - min_val) / (max_val - min_val)
 
 
-def peak_normalize(data):
+def peakNormalize(data):
     """
     Normalize by peak value.
     """
@@ -60,7 +60,7 @@ def peak_normalize(data):
     return data_array / peak
 
 
-def robust_zscore_normalize(data):
+def robustZscoreNormalize(data):
     """
     Robust z-score using Median Absolute Deviation.
     """

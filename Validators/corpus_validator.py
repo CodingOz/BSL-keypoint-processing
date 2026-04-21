@@ -1,4 +1,4 @@
-from .keypoint_validator import CubicSplineKeyPointInterpolator, Sigh_lenths
+from .keypoint_validator import CubicSplineKeyPointInterpolator, SignLengths
 import json
 import os
 from dataclasses import dataclass
@@ -69,7 +69,7 @@ class CorpusValidator:
                     
         print(f"{len(self.validators)} files found in corpus")
         
-    def get_all_palm_locations(self):
+    def getAllPalmLocations(self):
         ''' checks if palm directory is empty '''
         if len(self.all_palm_locations) > 0:
             return self.all_palm_locations
@@ -78,7 +78,7 @@ class CorpusValidator:
             self.all_palm_locations[validator.filepath] = validator.getFilledPalmCenters()
         return self.all_palm_locations
     
-    def get_all_palm_momentums(self):
+    def getAllPalmMomentums(self):
         ''' checks if palm directory is empty '''
         if len(self.all_palm_momentums) > 0:
             return self.all_palm_momentums
@@ -87,7 +87,7 @@ class CorpusValidator:
             self.all_palm_momentums[validator.filepath] = validator.getEstimatedMomentums()
         return self.all_palm_momentums
     
-    def get_all_palm_accelerations(self):
+    def getAllPalmAccelerations(self):
         ''' checks if palm directory is empty '''
         if len(self.all_palm_accelerations) > 0:
             return self.all_palm_accelerations
@@ -96,16 +96,16 @@ class CorpusValidator:
             self.all_palm_accelerations[validator.filepath] = validator.getEstimatedAccelerations()
         return self.all_palm_accelerations
     
-    def get_all_timings(self):
+    def getAllTimings(self):
         ''' returns a list of Sign_lengths dataclasses, one per file in the corpus, 
         containing the first and last frame where a hand is detected '''
         if len(self.timings) > 0:
             return self.timings
         for validator in self.validators:
-            self.timings.append(validator.getSignLenths())
+            self.timings.append(validator.getSignLengths())
         return self.timings
   
-    def detect_movement_anomalies(
+    def detectMovementAnomalies(
         self,
         acceleration_threshold: float = 0.2,
         momentum_threshold: float = 0.15,
@@ -119,11 +119,11 @@ class CorpusValidator:
         that contains at least one anomaly.
         """
         # ensure all data is populated
-        self.get_all_palm_momentums()
-        self.get_all_palm_accelerations()
-        self.get_all_timings()
+        self.getAllPalmMomentums()
+        self.getAllPalmAccelerations()
+        self.getAllTimings()
 
-        # build a fast lookup: filepath -> Sign_lengths dataclass
+        # build a fast lookup: filepath -> SignLengths dataclass
         timing_lookup: dict[str, any] = {
             t.filepath: t for t in self.timings
         }
@@ -216,7 +216,7 @@ class CorpusValidator:
 
         return results
     
-    def analyse_anomaly_distribution(
+    def analyseAnomalyDistribution(
         self,
         anomaly_results: list[MovementAnomalyDetectionResult],
         max_components: int = 4,
@@ -362,7 +362,7 @@ class CorpusValidator:
             is_bimodal=is_bimodal,
         )
         
-    def get_all_hand_distances(self, midpoint=0.5) -> dict:
+    def getAllHandDistances(self, midpoint=0.5) -> dict:
         """
         Returns fixed-midpoint distances for every file in the corpus.
         
@@ -384,7 +384,7 @@ class CorpusValidator:
         return self._all_hand_distances
 
 
-    def get_all_adaptive_distances(self) -> dict:
+    def getAllAdaptiveDistances(self) -> dict:
         """
         Returns adaptive-midpoint distances and the derived midpoint for every file.
 

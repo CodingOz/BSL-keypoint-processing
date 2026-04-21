@@ -11,7 +11,7 @@ class AnomalyDetection():
         self.movement_flags = None
         self.posision_flags = self.validator.flagAbnormalDistances()
     
-    def movementAnomalys(self, 
+    def movementAnomalies(self, 
                          threshold=0.15):
         '''returns hands with flagged speeds'''
         if threshold:
@@ -20,7 +20,7 @@ class AnomalyDetection():
             self.movement_flags = self.validator.findMovmentClusters()
         return self.movement_flags
     
-    def posisionAnomalys(self, 
+    def positionAnomalies(self, 
                          threshold=-0.15):
         '''returns hands with flagged positions (too far on the wrong side)'''
         if threshold:
@@ -29,10 +29,10 @@ class AnomalyDetection():
             self.posision_flags = self.validator.flagAbnormalDistances() 
         return self.posision_flags
     
-    def filledMovementAnomalys(self,
+    def filledMovementAnomalies(self,
                                 gap_size=5,
                                 threshold=0.15):
-        flags = self.movementAnomalys(threshold=threshold)
+        flags = self.movementAnomalies(threshold=threshold)
         
         # get interpolated frame indices so we don't flag estimated values
         _, estimation_flags = self.validator.getFilledPalmCenters()
@@ -87,7 +87,7 @@ class AnomalyDetection():
         
         return result[0], result[1]
     
-    def filledMovementAnomalysByMAD(self,
+    def filledMovementAnomaliesByMAD(self,
                                 gap_size=5,
                                 threshold=0.15):
         flags = self.validator.findMovementRelativeByMAD(threshold=threshold)
@@ -145,7 +145,7 @@ class AnomalyDetection():
         
         return result[0], result[1]
     
-    def filledMovementAnomalysByPercentile(self, percentile, gap_size=5):
+    def filledMovementAnomaliesByPercentile(self, percentile, gap_size=5):
         
         flags = self.validator.findMovementRelativeByPercentile(percentile=percentile)
         
@@ -202,7 +202,7 @@ class AnomalyDetection():
         
         return result[0], result[1]
     
-    def filledMovementAnomalysByStdDev(self, num_std_dev, gap_size=5):
+    def filledMovementAnomaliesByStdDev(self, num_std_dev, gap_size=5):
         
         flags = self.validator.findMovementRelativeByStdDev(num_std_dev=num_std_dev)
         
@@ -259,11 +259,11 @@ class AnomalyDetection():
         
         return result[0], result[1]
 
-    def posisionAndMovmentAnomalys(self, 
+    def positionAndMovementAnomalies(self, 
                                    position_threshold=-0.15, 
                                    movement_threshole=0.15):
-        movement = self.movementAnomalys(threshold=movement_threshole)
-        posision = self.posisionAnomalys(threshold=position_threshold)
+        movement = self.movementAnomalies(threshold=movement_threshole)
+        posision = self.positionAnomalies(threshold=position_threshold)
         
         left =set(movement[0]) | set(posision[0])
         
@@ -271,13 +271,13 @@ class AnomalyDetection():
         
         return list(sorted(left)), list(sorted(right))
     
-    def posisionAndFilledMovmentAnomalys(self, 
+    def positionAndFilledMovementAnomalies(self, 
                                    position_threshold=-0.15, 
                                    movement_threshole=0.15,
                                    gap_size=5):
-        movement = self.filledMovementAnomalys(gap_size=gap_size, 
+        movement = self.filledMovementAnomalies(gap_size=gap_size, 
                                                threshold=movement_threshole)
-        posision = self.posisionAnomalys(threshold=position_threshold)
+        posision = self.positionAnomalies(threshold=position_threshold)
         
         left =set(movement[0]) | set(posision[0])
         
@@ -581,7 +581,7 @@ class AnomalyDetection():
         else:
             return result, result
     
-    def position_and_filled_movement_and_acceleration_anomalys(self, 
+    def positionAndFilledMovementAndAccelerationAnomalies(self, 
                                                position_threshold=-0.1, 
                                                movement_threshold=0.1, 
                                                acceleration_threshold=0.1,

@@ -8,11 +8,11 @@ from video_file_manager import VideoManager
 from PIL import Image
 import numpy as np
 import subprocess
-from Validators.orientation_validator import orientation_checker
+from Validators.orientation_validator import OrientationChecker
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from copy import deepcopy
 
-class KeyPointExtractorV1:
+class KeypointExtractorV1:
     '''Extracts pose and hand keypoints from videos using MediaPipe
     
     atributes:
@@ -153,7 +153,7 @@ class KeyPointExtractorV1:
             raise RuntimeError(f"Could not open video: {filename}")
 
         # Detect rotation
-        rotation_checker = orientation_checker()
+        rotation_checker = OrientationChecker()
         rotation_angle = rotation_checker.get_rotation_metadata(filename)
         
         # assums sign corisponding to folder name, and video id corresponding to file name
@@ -402,7 +402,7 @@ class KeyPointExtractorV2:
         if not cap.isOpened():
             raise RuntimeError(f"Could not open video: {filename}")
 
-        rotation_angle = orientation_checker().get_rotation_metadata(filename)
+        rotation_angle = OrientationChecker().getRotationMetadata(filename)
 
         sign = Path(filename).parent.name
         video_id = Path(filename).stem

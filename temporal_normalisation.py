@@ -5,7 +5,7 @@ import numpy as np
 
 class TemporalNormalisor:
 
-    def MakeNormalisedKeypointFile(self, source_path, target_path, frame_num):
+    def makeNormalisedKeypointFile(self, source_path, target_path, frame_num):
         """
         Normalises a keypoint file to exactly `frame_num` frames using PCHIP
         interpolation along each landmark's 2-D trajectory.
@@ -100,7 +100,7 @@ class TemporalNormalisor:
 
         return output
     
-    def NormaliseCorpus(self, source_dir, target_dir, frame_num, show_logs=False):
+    def normaliseCorpus(self, source_dir, target_dir, frame_num, show_logs=False):
         """
         Normalises all keypoint files in `source_dir` to `frame_num` frames and
         writes them to `target_dir` with the same filenames, preserving nested
@@ -127,7 +127,7 @@ class TemporalNormalisor:
             target_path = target_dir / relative_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
             
-            self.MakeNormalisedKeypointFile(str(source_path), str(target_path), frame_num)
+            self.makeNormalisedKeypointFile(str(source_path), str(target_path), frame_num)
             if show_logs:
                 print(f"Normalised {relative_path} to {frame_num} frames.")
         

@@ -21,7 +21,7 @@ class EncryptionManager:
         encrypt_file: Encrypts a file using the encryption key
         decrypt_file: Decrypts a file using the encryption key
     '''
-    def generate_encryption_key(self):
+    def generateEncryptionKey(self):
         '''
         Generates a new Fernet encryption key and saves it to a file.
         
@@ -39,7 +39,7 @@ class EncryptionManager:
             logging.error(f"Failed to generate encryption key: {e}")
             return None
     
-    def get_encryption_key(self):
+    def getEncryptionKey(self):
         ''' Reads the encryption key from file.
         returns:
             The encryption key (bytes) or raises an exception if it cannot be read
@@ -68,7 +68,7 @@ class EncryptionManager:
             logging.error(f"Could not read encryption key: {e}")
             raise
         
-    def encrypt_file(self, file_path, key):
+    def encryptFile(self, file_path, key):
         ''' Encrypts a file using the provided encryption key.
         takes:
             file_path: Path to the file to encrypt
@@ -91,7 +91,7 @@ class EncryptionManager:
         # Delete original unencrypted file
         os.remove(file_path)
     
-    def decrypt_file(self, encrypted_file_path, key):
+    def decryptFile(self, encrypted_file_path, key):
         ''' Decrypts a file using the provided encryption key.
         takes:
             encrypted_file_path: Path to the encrypted file
@@ -157,7 +157,7 @@ class VideoManager(EncryptionManager):
             's3', 
             endpoint_url=os.getenv('R2_ENDPOINT'))
 
-    def download_all(self, directory):
+    def downloadAll(self, directory):
         ''' Downloads all .mp4 videos from the specified S3 bucket, 
             encrypts them, and saves to the local directory.
         takes:
@@ -219,7 +219,7 @@ class VideoManager(EncryptionManager):
             logging.error(f"Error downloading files: {e}")
             raise
 
-    def orginise_videos(self, unorginised_directory, orginised_directory):
+    def organiseVideos(self, unorganised_directory, organised_directory):
         ''' Organizes encrypted video files into letter-based folders.
         takes:
             unorginised_directory: Directory containing unorganized encrypted video files
@@ -254,7 +254,7 @@ class VideoManager(EncryptionManager):
                 os.rename(source_path, target_path)
                 print(f'Moved {source_path} to {target_path}')
 
-    def delete_video(self, file_path):
+    def deleteVideo(self, file_path):
         ''' Deletes a specified video file.
         takes:
             file_path: Path to the video file to delete'''
@@ -277,7 +277,7 @@ class VideoManager(EncryptionManager):
                     encryption_key = self.get_encryption_key()
                     self.encrypt_file(file_path, encryption_key)
 
-    def quality_check(self, directory):
+    def qualityCheck(self, directory):
         ''' Provides a GUI for quality checking and categorizing encrypted video files.
         takes:
             directory: Path to the directory containing encrypted video files organized in letter-based folders
