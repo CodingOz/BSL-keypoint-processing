@@ -1,5 +1,5 @@
 import uuid
-from flask import render_template, redirect, request, jsonify
+from flask import render_template, request, jsonify
 from app import app
 from app.forms import make_video_upload_form
 from app.r2 import upload_submission

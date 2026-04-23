@@ -1,4 +1,3 @@
-from copy import deepcopy
 from data_cleaner import DataCleaner
 from anomaly_detection import AnomalyDetection
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
@@ -7,11 +6,8 @@ import json
 import os
 from dataclasses import dataclass, field
 from typing import Callable
-import numpy as np
 import sys
 from pathlib import Path
-import shutil
-import tempfile
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
@@ -808,9 +804,9 @@ class RunDetectionTests:
                     f"{recall:>8.3f}  {n_files:>6}")
 
             print(
-                f"\n  Note: precision/F1 per swap size omitted — FPs arise from clean frames")
+                "\n  Note: precision/F1 per swap size omitted — FPs arise from clean frames")
             print(
-                f"        unattributable to any single swap. Use aggregate table for F1.")
+                "        unattributable to any single swap. Use aggregate table for F1.")
 
         print(f"\n{'═' * 80}")
 

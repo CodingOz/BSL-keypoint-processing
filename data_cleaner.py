@@ -263,7 +263,7 @@ def cleanCorpus(source_root, target_root,
                 stats['failed_files'].append((rel_path, str(e)))
                 print(f"  FAILED {rel_path}: {e}")
 
-    print(f"\n=== Corpus cleaning complete ===")
+    print("\n=== Corpus cleaning complete ===")
     print(f"Files processed: {stats['files_processed']}")
     print(f"Files failed:    {stats['files_failed']}")
     print(f"Total left anomalies removed:  {stats['total_left_anomalies']}")

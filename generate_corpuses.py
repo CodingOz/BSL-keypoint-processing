@@ -1,7 +1,6 @@
 import os
 import json
 import numpy as np
-from pathlib import Path
 from feature_extraction import FeatureExraction
 
 

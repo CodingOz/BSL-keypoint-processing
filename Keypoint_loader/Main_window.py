@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QSlider,
     QSpinBox,
-    QDoubleSpinBox,
     QComboBox)
 from PySide6.QtCore import Qt, Signal
 import os

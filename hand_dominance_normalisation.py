@@ -1,7 +1,5 @@
 import json
 import os
-from copy import deepcopy
-import sys
 
 
 from PySide6.QtWidgets import (
@@ -9,7 +7,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QProgressBar,
     QSpinBox, QSlider, QCheckBox
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 
 from Keypoint_loader.Data_model import DataModel

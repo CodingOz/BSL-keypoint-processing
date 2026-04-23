@@ -1,10 +1,7 @@
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
-from scipy.stats import norm
 import numpy as np
 import json
-import shutil
-from anomaly_detection import AnomalyDetection
 from helpers.validation_helpers import *
 from sign_degradator import SignDegradator
 import sys
@@ -411,7 +408,7 @@ class CorpusDegradator:
             results['degraded_files'])
 
         # DEBUG: Print actual degradation summary
-        print(f"\n=== Degradation Summary ===")
+        print("\n=== Degradation Summary ===")
         successful = [f for f in results['degraded_files'] if 'error' not in f]
         print(
             f"Successful: {len(successful)}/{len(results['degraded_files'])}")

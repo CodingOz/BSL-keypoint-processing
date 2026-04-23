@@ -39,7 +39,7 @@ class OrientationChecker:
                             f"rotation needed: {(-data.get('rotation')) % 360}")
                         return int(-data.get('rotation')) % 360
 
-            print(f"No rotation metadata found")
+            print("No rotation metadata found")
             return 0
 
         except Exception as e:

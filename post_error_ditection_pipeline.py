@@ -1,4 +1,3 @@
-import json
 from keypoint_interpolator import KeypointInterpolator
 from temporal_cropping import TemporalCropping
 from temporal_normalisation import TemporalNormalisor

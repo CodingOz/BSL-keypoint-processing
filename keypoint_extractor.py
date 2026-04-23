@@ -1,15 +1,9 @@
 import cv2
 import json
-from matplotlib.pylab import sign
 import mediapipe as mp
 from pathlib import Path
 import os
-from video_file_manager import VideoManager
-from PIL import Image
-import numpy as np
-import subprocess
 from Validators.orientation_validator import OrientationChecker
-from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from copy import deepcopy
 
 
@@ -241,47 +235,6 @@ class KeypointExtractorV1:
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
 
-    def extract_all(self, directory, output_directory):
-        '''
-        takes:
-            directory: Path to the input directory containing videos
-            output_directory: Path to the output directory for JSON files
-        '''
-        video_manager = VideoManager()
-
-        for root, dirs, files in os.walk(directory):
-
-            if 'valid' in dirs:
-                dirs[:] = ['valid']
-            for file in files:
-                if file.endswith('.mp4.encrypted'):
-                    parts = file.split('_')
-
-                    if len(parts) > 1:
-                        p = parts[-1].split('.')
-                        video_id = parts[1]
-                        sign = p[0]
-                    # for manually recorded videos without standard naming
-                    else:
-                        p = file.split('.')
-                        # cuts last character of first part
-                        video_id = 'manual-' + p[0][-1]
-                        sign = p[0][:-1]
-
-                    # decripts video
-                    video_path = os.path.join(root, file)
-                    decrypted_path = video_manager.decrypt_file(
-                        video_path, video_manager.get_encryption_key())
-
-                    sign_directory = Path(output_directory) / sign
-                    sign_directory.mkdir(parents=True, exist_ok=True)
-                    output_path = sign_directory / f"{video_id}.json"
-                    self.extract_to_json(decrypted_path, output_path)
-
-                    # reincrypts video
-                    video_manager.encrypt_file(
-                        decrypted_path, video_manager.get_encryption_key())
-
     def rotate_frame(self, frame, angle):
         """Rotate frame by given angle.
         takes:
@@ -480,43 +433,6 @@ class KeyPointExtractorV2:
 
         with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
-
-    def extract_all(self, directory, output_directory):
-        """Walk *directory* and extract keypoints from every encrypted video.
-
-        Args:
-            directory:        Root directory containing videos.
-            output_directory: Root directory for output JSON files.
-        """
-        video_manager = VideoManager()
-
-        for root, dirs, files in os.walk(directory):
-            if "valid" in dirs:
-                dirs[:] = ["valid"]
-
-            for file in files:
-                if not file.endswith(".mp4.encrypted"):
-                    continue
-
-                parts = file.split("_")
-                if len(parts) > 1:
-                    video_id = parts[1]
-                    sign = parts[-1].split(".")[0]
-                else:
-                    p = file.split(".")
-                    video_id = "manual-" + p[0][-1]
-                    sign = p[0][:-1]
-
-                video_path = os.path.join(root, file)
-                key = video_manager.get_encryption_key()
-                decrypted_path = video_manager.decrypt_file(video_path, key)
-
-                sign_dir = Path(output_directory) / sign
-                sign_dir.mkdir(parents=True, exist_ok=True)
-                output_path = sign_dir / f"{video_id}.json"
-
-                self.extract_to_json(decrypted_path, output_path)
-                video_manager.encrypt_file(decrypted_path, key)
 
     def rotate_frame(self, frame, angle):
         """Rotate *frame* by *angle* degrees (must be 90, 180, or 270).

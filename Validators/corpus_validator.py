@@ -1,9 +1,8 @@
-from .keypoint_validator import CubicSplineKeyPointInterpolator, SignLengths
-import json
+from .keypoint_validator import CubicSplineKeyPointInterpolator
 import os
 from dataclasses import dataclass
 import numpy as np
-from scipy.stats import gaussian_kde, ks_2samp, norm
+from scipy.stats import gaussian_kde, norm
 from sklearn.mixture import GaussianMixture
 import matplotlib.pyplot as plt
 
@@ -363,7 +362,7 @@ class CorpusValidator:
                 plt.show()
 
         # summary
-        print(f"\n Anomaly Distribution Analysis ")
+        print("\n Anomaly Distribution Analysis ")
         print(f"  Total anomalous frames : {len(all_pcts):,}")
         print(
             f"  Best GMM k             : {best_n}  (BIC={bic_scores[best_n]:.1f})")

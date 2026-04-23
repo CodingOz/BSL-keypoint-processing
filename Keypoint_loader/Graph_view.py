@@ -1,5 +1,5 @@
 import pyqtgraph as pg
-from PySide6.QtCore import Qt, QTimer, QPointF
+from PySide6.QtCore import QTimer
 import time
 from PySide6.QtWidgets import QToolTip
 from PySide6.QtGui import QCursor

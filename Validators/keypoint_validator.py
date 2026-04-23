@@ -4,7 +4,6 @@ from helpers.validation_helpers import *
 import json
 import math
 import traceback
-import os
 import numpy as np
 from scipy.signal import medfilt
 
@@ -724,7 +723,7 @@ class KalmanKeyPointEstimator(KeyPointValidator):
             # Calculate statistics
             left_estimated = sum(1 for e in estimation_flags if e['left'])
             right_estimated = sum(1 for e in estimation_flags if e['right'])
-            print(f"\nEstimation summary:")
+            print("\nEstimation summary:")
             print(
                 f"  Left hand: {left_estimated}/{len(self.frames)} frames estimated "
                 f"({100*left_estimated/len(self.frames):.1f}%)")

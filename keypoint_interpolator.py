@@ -1,7 +1,6 @@
 import json
 from copy import deepcopy
-from turtle import left
-from Validators.keypoint_validator import CubicSplineKeyPointInterpolator, SignLengths
+from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from pathlib import Path
 
 

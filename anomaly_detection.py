@@ -1,4 +1,3 @@
-from unittest import result
 import math
 
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator

@@ -1,4 +1,8 @@
-from Validators.keypoint_validator import KeyPointValidator, KalmanKeyPointEstimator, CubicSplineKeyPointInterpolator
+from Validators.keypoint_validator import (
+    KeyPointValidator,
+    KalmanKeyPointEstimator,
+    CubicSplineKeyPointInterpolator,
+)
 import numpy as np
 import json
 import os

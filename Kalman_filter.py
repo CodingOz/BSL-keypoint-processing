@@ -92,8 +92,8 @@ class HandPositionKalmanFilter:
         self.x = self.x + K @ y_innov
 
         # Update covariance
-        I = np.eye(4)
-        self.P = (I - K @ self.H) @ self.P
+        identity_matrix = np.eye(4)
+        self.P = (identity_matrix - K @ self.H) @ self.P
 
         return self.x[:2].copy()  # Return filtered position
 
