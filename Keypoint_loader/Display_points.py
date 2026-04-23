@@ -33,24 +33,24 @@ def main():
 
     # connect playback to UI via MainWindow helper
     window.set_playback_controller(playback)
-    
+
     # update playback and display when files are loaded
     def update_playback_on_file_change():
         playback.update_max_frames(data.frame_count())
         window.frame_spinbox.setMaximum(max(data.frame_count() - 1, 0))
-        
+
         # update graph with current frame (frame 0)
         graph.update_frame(data.get_frame(0))
         window.update_frame_display(0)
-    
+
     window.file_list.itemChanged.connect(update_playback_on_file_change)
-    
+
     # connect cluster filter changes
     window.cluster_filters.connect(graph.set_cluster_filter)
     window.cluster_filters.connect(
         lambda _: graph.update_frame(data.get_frame(playback.current_frame))
     )
-    
+
     # connect palm mode changes
     window.palm_mode_changed.connect(graph.set_palm_mode)
     window.palm_mode_changed.connect(

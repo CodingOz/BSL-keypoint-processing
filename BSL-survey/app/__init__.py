@@ -1,3 +1,5 @@
+from app import views
+from flask_wtf.csrf import CSRFProtect
 from flask import Flask
 from flask_talisman import Talisman
 
@@ -45,11 +47,11 @@ Talisman(
     }
 )
 
+
 @app.template_filter("getattr")
 def jinja_getattr(obj, attr):
     return getattr(obj, attr)
 
-from app import views
-from flask_wtf.csrf import CSRFProtect
+
 csrf = CSRFProtect(app)
 csrf.exempt(views.submit)

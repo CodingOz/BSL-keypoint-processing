@@ -4,10 +4,15 @@ from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
+
 class TemporalCropping:
-    def cropSingleHandedFrames(self, json_path, destination_path, show_logs=False):
+    def cropSingleHandedFrames(
+            self,
+            json_path,
+            destination_path,
+            show_logs=False):
         '''Crops frames from the start and end of the signing region where only one hand is present
-        
+
         takes:
             json_path: the path to the json file to crop
             destination_path: the path to save the cropped json file
@@ -17,45 +22,50 @@ class TemporalCropping:
         lengths = interpolator.getSignLengths()
         start_frame = lengths.first_with_both
         end_frame = lengths.last_with_both
-        
+
         # Load the JSON file
         with open(json_path, 'r') as f:
             data = json.load(f)
-        
+
         if show_logs:
-            print(f"{json_path}: Cropping frames from {start_frame} to {end_frame} where both hands are present.")
-        
+            print(
+                f"{json_path}: Cropping frames from {start_frame} to {end_frame} where both hands are present.")
+
         # empty hand frames before start_frame and after end_frame
         cropped_frames = data['frames'][start_frame:end_frame + 1]
-        
+
         for frame in data['frames'][:start_frame]:
             frame['hands']['left'] = []
             frame['hands']['right'] = []
-        
+
         for frame in data['frames'][end_frame + 1:]:
             frame['hands']['left'] = []
             frame['hands']['right'] = []
-        
+
         # update metadata with number of frames cropped from start and end
         frames_cropped_start = start_frame
         frames_cropped_end = len(data['frames']) - end_frame - 1
         data['metadata']['frames_cropped_start'] = frames_cropped_start
         data['metadata']['frames_cropped_end'] = frames_cropped_end
         data['frames'] = cropped_frames
-        
+
         # save to destination path
         Path(destination_path).parent.mkdir(parents=True, exist_ok=True)
         with open(destination_path, 'w') as f:
             json.dump(data, f, indent=2)
-        
-    def cropSingleHandedFramesInCorpus(self, source_corpus, target_corpus, show_logs=False):
+
+    def cropSingleHandedFramesInCorpus(
+            self,
+            source_corpus,
+            target_corpus,
+            show_logs=False):
         '''Crops frames from the start and end of the signing region where only one hand is present
         for all json files in a corpus using the cropSingleHandedFrames method
         takes:
             source_corpus: the path to the corpus of json files to crop
             target_corpus: the location where the cropped json files are to be generated to
             show_logs: whether to print logs of the cropping process'''
-        
+
         source_corpus = Path(source_corpus)
         target_corpus = Path(target_corpus)
         target_corpus.mkdir(parents=True, exist_ok=True)
@@ -63,20 +73,25 @@ class TemporalCropping:
         for json_path in source_corpus.rglob('*.json'):
             # mirror the subdirectory structure in the target corpus
             relative_path = json_path.relative_to(source_corpus)
-            output_path   = target_corpus / relative_path
+            output_path = target_corpus / relative_path
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            self.cropSingleHandedFrames(str(json_path), str(output_path), show_logs=show_logs)
-    
-    def cropHandsRestingTogether(self, json_path, destination_path, show_logs=False):
+            self.cropSingleHandedFrames(
+                str(json_path), str(output_path), show_logs=show_logs)
+
+    def cropHandsRestingTogether(
+            self,
+            json_path,
+            destination_path,
+            show_logs=False):
         '''Crops frames from the start and end of the signing region where both hands are resting together
-        using the detectRestPositionFrames to find start and end frames of the signing region 
+        using the detectRestPositionFrames to find start and end frames of the signing region
         reseting the frame indexes to start at 0 and continuously increasing suquentially, and
         updating the metadata with the number of frames cropped from the start and end of the signing region
-        
-        this anomaly confuses the later 2 part pipeline so it is important to crop these frames out before the stroke phase cropping, 
+
+        this anomaly confuses the later 2 part pipeline so it is important to crop these frames out before the stroke phase cropping,
         and to do it in a way that updates the frame indexes and metadata correctly
-        
+
         takes:
             json_path: the path to the json file to crop
             destination_path: the path to save the cropped json file
@@ -84,60 +99,65 @@ class TemporalCropping:
 
         interpolator = CubicSplineKeyPointInterpolator(json_path)
         start_frame, end_frame = interpolator.detectRestPositionFrames()
-        
+
         if show_logs:
-            print(f"{json_path}: Cropping frames from {start_frame} to {end_frame} where both hands are resting together.")
-        
+            print(
+                f"{json_path}: Cropping frames from {start_frame} to {end_frame} where both hands are resting together.")
+
         # Load the JSON file
         with open(json_path, 'r') as f:
             data = json.load(f)
-        
+
         # Calculate frames cropped
         frames_cropped_start = start_frame
         original_total_frames = len(data['frames'])
         frames_cropped_end = original_total_frames - end_frame - 1
-        
+
         # Extract cropped frames
         cropped_frames = data['frames'][start_frame:end_frame + 1]
-        
+
         # Get FPS for timestamp recalculation
         fps = data['metadata'].get('fps', 25)
-        
+
         # Reset frame indexes and recalculate timestamps
         for new_index, frame in enumerate(cropped_frames):
             frame['frame_index'] = new_index
             frame['timestamp'] = new_index / fps
-        
+
         # Update metadata
         data['metadata']['frame_count'] = len(cropped_frames)
         data['metadata']['frames_cropped_start'] = frames_cropped_start
         data['metadata']['frames_cropped_end'] = frames_cropped_end
-        
+
         # Update frames
         data['frames'] = cropped_frames
-        
+
         # Ensure destination directory exists
         Path(destination_path).parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Save the cropped JSON file
         with open(destination_path, 'w') as f:
             json.dump(data, f, indent=2)
-        
+
         if show_logs:
             print(f"Cropped JSON saved to {destination_path}")
             print(f"Frames cropped from start: {frames_cropped_start}")
             print(f"Frames cropped from end: {frames_cropped_end}")
             print(f"Original frame count: {original_total_frames}")
             print(f"New frame count: {len(cropped_frames)}")
-    
-    def cropHandsRestingTogetherInCorpus(self, source_corpus, target_corpus, show_logs=False):
+
+    def cropHandsRestingTogetherInCorpus(
+            self,
+            source_corpus,
+            target_corpus,
+            show_logs=False):
         '''Crops frames from the start and end of the signing region where both hands are resting together
         for all json files in a corpus using the cropHandsRestingTogether method
         takes:
             source_corpus: the path to the corpus of json files to crop
             target_corpus: the location where the cropped json files are to be generated to
             show_logs: whether to print logs of the cropping process'''
-        
+
         source_corpus = Path(source_corpus)
         target_corpus = Path(target_corpus)
         target_corpus.mkdir(parents=True, exist_ok=True)
@@ -145,26 +165,27 @@ class TemporalCropping:
         for json_path in source_corpus.rglob('*.json'):
             # mirror the subdirectory structure in the target corpus
             relative_path = json_path.relative_to(source_corpus)
-            output_path   = target_corpus / relative_path
+            output_path = target_corpus / relative_path
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            self.cropHandsRestingTogether(str(json_path), str(output_path), show_logs=show_logs) 
+            self.cropHandsRestingTogether(
+                str(json_path), str(output_path), show_logs=show_logs)
 
-    def segmentSignPhases( self,
-        palm_distances: np.ndarray,
-        momentum_left: np.ndarray,
-        momentum_right: np.ndarray,
-        closest_distances: np.ndarray,
-        hand_scales: np.ndarray,
-        *,
-        # Stage 1 parameters
-        smoothing_sigma: float = 2.5,
-        rise_threshold_fraction: float = 0.25,
-        min_sign_frames: int = 5,
-        # Stage 2 parameters
-        composite_halfmax_fraction: float = 0.50,
-        refinement_search_window: int = 10,
-    ) -> dict:
+    def segmentSignPhases(self,
+                          palm_distances: np.ndarray,
+                          momentum_left: np.ndarray,
+                          momentum_right: np.ndarray,
+                          closest_distances: np.ndarray,
+                          hand_scales: np.ndarray,
+                          *,
+                          # Stage 1 parameters
+                          smoothing_sigma: float = 2.5,
+                          rise_threshold_fraction: float = 0.25,
+                          min_sign_frames: int = 5,
+                          # Stage 2 parameters
+                          composite_halfmax_fraction: float = 0.50,
+                          refinement_search_window: int = 10,
+                          ) -> dict:
         """
         Segment a BSL fingerspelling recording into preparation, sign, and
         retraction phases.
@@ -209,24 +230,21 @@ class TemporalCropping:
             The three phases tile the recording without overlap or gap.
         """
 
-
-        palm_dist= np.asarray(palm_distances,    dtype=float)
-        mom_l= np.asarray(momentum_left,     dtype=float)
-        mom_r= np.asarray(momentum_right,    dtype=float)
-        closest= np.asarray(closest_distances, dtype=float)
+        palm_dist = np.asarray(palm_distances, dtype=float)
+        mom_l = np.asarray(momentum_left, dtype=float)
+        mom_r = np.asarray(momentum_right, dtype=float)
+        closest = np.asarray(closest_distances, dtype=float)
 
         n = len(mom_l)
         if not (len(mom_r) == len(closest) == n):
             raise ValueError(
                 f"All momentum/closest arrays must be the same length. "
                 f"Got: momentum_left={len(mom_l)}, momentum_right={len(mom_r)}, "
-                f"closest_distances={len(closest)}."
-            )
+                f"closest_distances={len(closest)}.")
         if n < 2 * min_sign_frames + 2:
             raise ValueError(
                 f"Recording has only {n} frames, which is too short to segment. "
-                f"Need at least {2 * min_sign_frames + 2} frames."
-            )
+                f"Need at least {2 * min_sign_frames + 2} frames.")
 
         # Stage 1 - Coarse boundary detection via momentum valley
         sign_start_coarse, sign_end_coarse = self._stage1ValleyDetection(
@@ -235,7 +253,10 @@ class TemporalCropping:
             rise_threshold_fraction=rise_threshold_fraction,
             min_sign_frames=min_sign_frames,
         )
-        print("points from stage 1 valley detection: ", sign_start_coarse, sign_end_coarse)
+        print(
+            "points from stage 1 valley detection: ",
+            sign_start_coarse,
+            sign_end_coarse)
         # Stage 2 - Boundary refinement via composite sign-presence score
         sign_start_refined, sign_end_refined = self._stage2CompositeRefinement(
             mom_l, mom_r, closest,
@@ -245,8 +266,11 @@ class TemporalCropping:
             search_window=refinement_search_window,
             min_sign_frames=min_sign_frames,
         )
-        print("points from stage 2 refinement: ", sign_start_refined, sign_end_refined)
-        
+        print(
+            "points from stage 2 refinement: ",
+            sign_start_refined,
+            sign_end_refined)
+
         # Stage 3 - Expand to include nearby frames with close hand proximity
         sign_start_expanded, sign_end_expanded = self._stage3ExpandByClosestDistance(
             fine_start=sign_start_refined,
@@ -256,10 +280,14 @@ class TemporalCropping:
             combined_momentum=np.maximum(mom_l, mom_r),
         )
 
-        print("points from stage 3 expansion: ", sign_start_expanded, sign_end_expanded)
-        
+        print(
+            "points from stage 3 expansion: ",
+            sign_start_expanded,
+            sign_end_expanded)
+
         # Assemble output phases
-        # Phases tile the recording: [0 … sign_start-1] | [sign_start … sign_end]
+        # Phases tile the recording: [0 … sign_start-1] | [sign_start …
+        # sign_end]
         prep_start = 0
         prep_end = sign_start_expanded - 1
         ret_start = sign_end_expanded + 1
@@ -275,8 +303,8 @@ class TemporalCropping:
 
         return {
             "preparation": (int(prep_start), int(prep_end)),
-            "sign":        (int(sign_start_expanded), int(sign_end_expanded)),
-            "retraction":  (int(ret_start), int(ret_end)),
+            "sign": (int(sign_start_expanded), int(sign_end_expanded)),
+            "retraction": (int(ret_start), int(ret_end)),
         }
 
     def _stage1ValleyDetection(
@@ -311,7 +339,8 @@ class TemporalCropping:
             # Degenerate case: flat signal (constant motion or no motion).
             # Return the full recording as a single "sign" phase.
             half = n // 2
-            return (max(0, half - min_sign_frames), min(n - 1, half + min_sign_frames))
+            return (max(0, half - min_sign_frames),
+                    min(n - 1, half + min_sign_frames))
 
         normalised = (smoothed - sig_min) / sig_range   # in [0, 1]
 
@@ -325,7 +354,7 @@ class TemporalCropping:
                 sign_start = i
                 break
         else:
-            sign_start = 0 
+            sign_start = 0
 
         sign_end = valley_centre
         for i in range(valley_centre, n):
@@ -363,7 +392,7 @@ class TemporalCropping:
         (sign_start_refined, sign_end_refined) — inclusive integer frame indices.
         """
         n = len(mom_l)
-        
+
         # Normalise momentum globally within this recording
         combined_mom = np.maximum(mom_l, mom_r)
         mom_min, mom_max = combined_mom.min(), combined_mom.max()
@@ -399,7 +428,7 @@ class TemporalCropping:
         # Walk rightward from the left edge of the window; refined start is the
         # leftmost frame where composite >= halfmax.
         search_left_start = max(0, coarse_start - search_window)
-        search_left_end   = min(n - 1, coarse_start + search_window)
+        search_left_end = min(n - 1, coarse_start + search_window)
 
         refined_start = coarse_start
         for i in range(search_left_start, search_left_end + 1):
@@ -409,7 +438,7 @@ class TemporalCropping:
 
         # Refine end boundary
         search_right_start = max(0, coarse_end - search_window)
-        search_right_end   = min(n - 1, coarse_end + search_window)
+        search_right_end = min(n - 1, coarse_end + search_window)
 
         refined_end = coarse_end
         for i in range(search_right_start, search_right_end + 1):
@@ -476,7 +505,7 @@ class TemporalCropping:
         # --- 3. Momentum guard -----------------------------------------------
         prep_region = combined_momentum[:fine_start]
         mom_cap = (np.percentile(prep_region, momentum_guard_percentile)
-                if len(prep_region) >= 3 else np.inf)
+                   if len(prep_region) >= 3 else np.inf)
 
         # --- 4. Walk left from fine_start ------------------------------------
         expanded_start = fine_start
@@ -495,11 +524,11 @@ class TemporalCropping:
             else:
                 consecutive_exit = 0
                 expanded_start = t
-        
+
         # --- 5. Walk right from fine_end -------------------------------------
         ret_region = combined_momentum[fine_end + 1:]
         mom_cap_ret = (np.percentile(ret_region, momentum_guard_percentile)
-                    if len(ret_region) >= 3 else np.inf)
+                       if len(ret_region) >= 3 else np.inf)
 
         expanded_end = fine_end
         consecutive_exit = 0
@@ -519,14 +548,15 @@ class TemporalCropping:
         # --- 6. Sanity clamp -------------------------------------------------
         # Never contract below Stage 2 boundaries
         expanded_start = min(expanded_start, fine_start)
-        expanded_end   = max(expanded_end,   fine_end)
+        expanded_end = max(expanded_end, fine_end)
 
         expanded_start = max(0, expanded_start)
-        expanded_end   = min(n - 1, expanded_end)
+        expanded_end = min(n - 1, expanded_end)
 
         return int(expanded_start), int(expanded_end)
-     
-    def _enforceMinWidth(self, start: int, end: int, min_frames: int, n: int) -> tuple[int, int]:
+
+    def _enforceMinWidth(self, start: int, end: int,
+                         min_frames: int, n: int) -> tuple[int, int]:
         """
         Expand (start, end) symmetrically if the window is narrower than
         min_frames, keeping indices within [0, n-1].
@@ -534,32 +564,33 @@ class TemporalCropping:
         width = end - start + 1
         if width < min_frames:
             deficit = min_frames - width
-            expand_left  = deficit // 2
+            expand_left = deficit // 2
             expand_right = deficit - expand_left
             start = max(0, start - expand_left)
-            end   = min(n - 1, end + expand_right)
+            end = min(n - 1, end + expand_right)
         return start, end
 
     def cropToStrokePhase(self, json_path, destination_path, show_logs=False):
         '''Crops frames from the start and end of the signing region to the stroke phase
-        saving the spreperation and retraction phases as arrays in the metadata, and 
+        saving the spreperation and retraction phases as arrays in the metadata, and
         updating the frame indexes to start at 0 and continuously increasing suquentially
         takes:
             json_path: the path to the json file to crop
             destination_path: the path to save the cropped json file
             show_logs: whether to print logs of the cropping process'''
-        
+
         validator = CubicSplineKeyPointInterpolator(json_path)
         palm_distances = validator.findPalmDistances()
         closest_distances = validator.findClosestDistances()
         # removes the last frame to match the length of the momentums
         palm_distances = palm_distances[:-1]
         closest_distances = closest_distances[:-1]
-        
+
         # Check if we have enough frames for segmentation (minimum 12 required)
         if len(palm_distances) < 12:
             if show_logs:
-                print(f"Skipping {json_path}: only {len(palm_distances)} frames (need at least 12)")
+                print(
+                    f"Skipping {json_path}: only {len(palm_distances)} frames (need at least 12)")
             # Copy the file as-is if too short
             Path(destination_path).parent.mkdir(parents=True, exist_ok=True)
             with open(json_path, 'r') as f:
@@ -567,43 +598,45 @@ class TemporalCropping:
             with open(destination_path, 'w') as f:
                 json.dump(data, f, indent=2)
             return
-        
+
         momentums = validator.getEstimatedMomentums()
-        left_momentum = [momentum['left']['magnitude'] for momentum in momentums]
-        right_momentum = [momentum['right']['magnitude'] for momentum in momentums]
-        hand_scales     = validator.getHandScales()
-       
+        left_momentum = [momentum['left']['magnitude']
+                         for momentum in momentums]
+        right_momentum = [momentum['right']['magnitude']
+                          for momentum in momentums]
+        hand_scales = validator.getHandScales()
+
         phases = self.segment_sign_phases(
             palm_distances,
             left_momentum,
             right_momentum,
             closest_distances,
             hand_scales
-            )
-        
+        )
+
         # Load the JSON file
         with open(json_path, 'r') as f:
             data = json.load(f)
         frames = data['frames']
-        
+
         # Extract phase boundaries
         prep_start, prep_end = phases['preparation']
         sign_start, sign_end = phases['sign']
         ret_start, ret_end = phases['retraction']
-        
+
         # Extract frames for each phase
         preparation_frames = frames[prep_start:prep_end + 1]
         stroke_frames = frames[sign_start:sign_end + 1]
         retraction_frames = frames[ret_start:ret_end + 1]
-        
+
         # Get FPS for timestamp recalculation
         fps = data['metadata'].get('fps', 25)
-        
+
         # Reset frame indexes and recalculate timestamps for stroke frames
         for new_index, frame in enumerate(stroke_frames):
             frame['frame_index'] = new_index
             frame['timestamp'] = new_index / fps
-        
+
         # Store preparation and retraction phases in metadata
         data['metadata']['preparation_phase'] = {
             'original_start_frame': prep_start,
@@ -622,33 +655,39 @@ class TemporalCropping:
             'original_end_frame': sign_end,
             'frame_count': len(stroke_frames)
         }
-        
+
         # Update frame count and frames
         data['metadata']['frame_count'] = len(stroke_frames)
         data['frames'] = stroke_frames
-               
-        
+
         # Ensure destination directory exists
         Path(destination_path).parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Save the cropped JSON file
         with open(destination_path, 'w') as f:
             json.dump(data, f, indent=2)
-        
+
         if show_logs:
             print(f"Stroke phase extracted and saved to {destination_path}")
-            print(f"Preparation frames: {len(preparation_frames)} (frames {prep_start}-{prep_end})")
-            print(f"Stroke frames: {len(stroke_frames)} (frames {sign_start}-{sign_end})")
-            print(f"Retraction frames: {len(retraction_frames)} (frames {ret_start}-{ret_end})")
+            print(
+                f"Preparation frames: {len(preparation_frames)} (frames {prep_start}-{prep_end})")
+            print(
+                f"Stroke frames: {len(stroke_frames)} (frames {sign_start}-{sign_end})")
+            print(
+                f"Retraction frames: {len(retraction_frames)} (frames {ret_start}-{ret_end})")
 
-    def cropToStrokePhaseInCorpus(self, source_corpus, target_corpus, show_logs=False):
+    def cropToStrokePhaseInCorpus(
+            self,
+            source_corpus,
+            target_corpus,
+            show_logs=False):
         '''Crops frames from the start and end of the signing region to the stroke phase
         for all json files in a corpus using the cropToStrokePhase method
         takes:
             source_corpus: the path to the corpus of json files to crop
             target_corpus: the location where the cropped json files are to be generated to
             show_logs: whether to print logs of the cropping process'''
-        
+
         source_corpus = Path(source_corpus)
         target_corpus = Path(target_corpus)
         target_corpus.mkdir(parents=True, exist_ok=True)
@@ -656,13 +695,17 @@ class TemporalCropping:
         for json_path in source_corpus.rglob('*.json'):
             # mirror the subdirectory structure in the target corpus
             relative_path = json_path.relative_to(source_corpus)
-            output_path   = target_corpus / relative_path
+            output_path = target_corpus / relative_path
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            self.cropToStrokePhase(str(json_path), str(output_path), show_logs=show_logs)
+            self.cropToStrokePhase(
+                str(json_path),
+                str(output_path),
+                show_logs=show_logs)
+
 
 if __name__ == "__main__":
-    source= r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus_Temporal_Cropping_level1"
-    target= r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus_Temporal_Cropping_level2"
+    source = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus_Temporal_Cropping_level1"
+    target = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus_Temporal_Cropping_level2"
     cropper = TemporalCropping()
     cropper.crop_to_stroke_phase_in_corpus(source, target, show_logs=True)

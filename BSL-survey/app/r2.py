@@ -12,6 +12,7 @@ s3 = boto3.client(
 
 BUCKET = os.environ["R2_BUCKET_NAME"]
 
+
 def upload_submission(submission_id, data):
     """Save keypoint JSON to R2 as submissions/{id}.json"""
     key = f"submissions/{submission_id}.json"

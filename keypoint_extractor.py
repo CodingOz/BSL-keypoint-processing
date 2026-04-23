@@ -12,9 +12,10 @@ from Validators.orientation_validator import OrientationChecker
 from Validators.keypoint_validator import CubicSplineKeyPointInterpolator
 from copy import deepcopy
 
+
 class KeypointExtractorV1:
     '''Extracts pose and hand keypoints from videos using MediaPipe
-    
+
     atributes:
         mp_pose: MediaPipe pose solution
         mp_hands: MediaPipe hands solution
@@ -26,8 +27,9 @@ class KeypointExtractorV1:
         extract_metadata: Extracts video metadata
         extract_to_json: Extracts keypoints and metadata from a video and saves to json
         extract_all: Processes all videos in a directory and saves keypoints to json files
-        rotate_frame: Rotates a video frame by a specified angle   
+        rotate_frame: Rotates a video frame by a specified angle
     '''
+
     def __init__(self):
         self.mp_pose = mp.solutions.pose
         self.mp_hands = mp.solutions.hands
@@ -46,7 +48,6 @@ class KeypointExtractorV1:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
-
 
     def extract_pose(self, image_rgb):
         '''
@@ -79,10 +80,10 @@ class KeypointExtractorV1:
         return pose_landmarks
 
     def extract_hand(self, image_rgb, frame_index):
-        ''' 
+        '''
         takes:
             image_rgb: A single video frame in RGB format
-            frame_index: current 
+            frame_index: current
         returns:
             extracted hand keypoints as a dictionary with keys "left" and "right", each containing a list of dictionaries with keys:
                 cluster_id: 0 for left hand, 1 for right hand
@@ -98,12 +99,12 @@ class KeypointExtractorV1:
             return hands_data, anomalous_hands
 
         for hand_landmarks, handedness in zip(
-            results.multi_hand_landmarks,
-            results.multi_handedness):
-            
+                results.multi_hand_landmarks,
+                results.multi_handedness):
+
             label = handedness.classification[0].label.lower()
             cluster_id = 0 if label == "left" else 1
-            
+
             if len(hand_landmarks.landmark) > 21:
                 anomalous_hands.append((frame_index, label))
 
@@ -129,7 +130,7 @@ class KeypointExtractorV1:
         '''
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        
+
         metadata = {
             "video_id": video_id,
             "sign": sign,
@@ -140,7 +141,7 @@ class KeypointExtractorV1:
             "mediapipe_version": mp.__version__
         }
         return metadata
-    
+
     def extract_to_json(self, filename, filepath):
         '''
         takes:
@@ -155,11 +156,12 @@ class KeypointExtractorV1:
         # Detect rotation
         rotation_checker = OrientationChecker()
         rotation_angle = rotation_checker.get_rotation_metadata(filename)
-        
-        # assums sign corisponding to folder name, and video id corresponding to file name
+
+        # assums sign corisponding to folder name, and video id corresponding
+        # to file name
         sign = Path(filename).parent.name
         video_id = Path(filename).stem
-        
+
         metadata = self.extract_metadata(cap, video_id=video_id, sign=sign)
         metadata["rotation_applied"] = rotation_angle
         frames = []
@@ -173,27 +175,28 @@ class KeypointExtractorV1:
             # Apply rotation BEFORE converting to RGB
             if rotation_angle != 0:
                 frame = self.rotate_frame(frame, rotation_angle)
-            
+
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pose_keypoints = self.extract_pose(image_rgb)
-            hand_keypoints, maltiple_hands = self.extract_hand(image_rgb, frame_index)
+            hand_keypoints, maltiple_hands = self.extract_hand(
+                image_rgb, frame_index)
             if len(maltiple_hands) > 0:
-                # concatenate anomalous hands to main list with frame index for later handling
+                # concatenate anomalous hands to main list with frame index for
+                # later handling
                 anomalous_hands.extend(maltiple_hands)
-                
+
             frames.append({
                 "frame_index": frame_index,
                 "timestamp": frame_index / fps if fps else None,
                 "pose": pose_keypoints,
                 "hands": hand_keypoints
             })
-            
 
             frame_index += 1
             ret, frame = cap.read()
 
         cap.release()
-        
+
         output = {
             "metadata": metadata,
             "frames": frames
@@ -204,38 +207,40 @@ class KeypointExtractorV1:
 
         with open(filepath, "w") as f:
             json.dump(output, f, indent=2)
-        
+
         if len(anomalous_hands) > 0:
             self.handle_simultaneous_hands(anomalous_hands, filepath)
 
         print(f"  Keypoints saved to {filepath}")
 
         return output
-    
+
     def handle_simultaneous_hands(self, anomalous_hands, filepath):
         '''takes cases where maltiples sets of keypoints in a single instance of a hand
         removes them from the main dataset and stores them within metadata for later use in the insertion validator.
-        takes: 
-            anomalous_hands: all points where this happens, held as 
-            filepath: path to the json file where the current version is 
+        takes:
+            anomalous_hands: all points where this happens, held as
+            filepath: path to the json file where the current version is
                 to be updated with corrected keypoints
-        
+
         '''
         # open json file and load data
         with open(filepath, 'r') as f:
             data = json.load(f)
-        
+
         for indx, side in anomalous_hands:
-            # copys full frame of data into array of anomalous frames in metadata
-            data['metadata'].setdefault('simultaneous_hands_frames', []).append(deepcopy(data['frames'][indx]))
+            # copys full frame of data into array of anomalous frames in
+            # metadata
+            data['metadata'].setdefault(
+                'simultaneous_hands_frames', []).append(
+                deepcopy(
+                    data['frames'][indx]))
             # removes hand keypoints from main dataset
             data['frames'][indx]['hands'][side] = []
         # saves updated json file
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
-            
 
-            
     def extract_all(self, directory, output_directory):
         '''
         takes:
@@ -243,15 +248,15 @@ class KeypointExtractorV1:
             output_directory: Path to the output directory for JSON files
         '''
         video_manager = VideoManager()
-        
+
         for root, dirs, files in os.walk(directory):
-            
+
             if 'valid' in dirs:
                 dirs[:] = ['valid']
             for file in files:
                 if file.endswith('.mp4.encrypted'):
                     parts = file.split('_')
-                    
+
                     if len(parts) > 1:
                         p = parts[-1].split('.')
                         video_id = parts[1]
@@ -265,19 +270,21 @@ class KeypointExtractorV1:
 
                     # decripts video
                     video_path = os.path.join(root, file)
-                    decrypted_path = video_manager.decrypt_file(video_path, video_manager.get_encryption_key())
-                    
+                    decrypted_path = video_manager.decrypt_file(
+                        video_path, video_manager.get_encryption_key())
+
                     sign_directory = Path(output_directory) / sign
                     sign_directory.mkdir(parents=True, exist_ok=True)
                     output_path = sign_directory / f"{video_id}.json"
                     self.extract_to_json(decrypted_path, output_path)
-                    
+
                     # reincrypts video
-                    video_manager.encrypt_file(decrypted_path, video_manager.get_encryption_key())
-       
+                    video_manager.encrypt_file(
+                        decrypted_path, video_manager.get_encryption_key())
+
     def rotate_frame(self, frame, angle):
         """Rotate frame by given angle.
-        takes: 
+        takes:
             frame: Video frame to rotate
             angle: Rotation angle in degrees (90, 180, 270)
         returns:
@@ -421,7 +428,8 @@ class KeyPointExtractorV2:
                 frame = self.rotate_frame(frame, rotation_angle)
 
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            hand_keypoints, multiple_hands = self.extract_hand(image_rgb, frame_index)
+            hand_keypoints, multiple_hands = self.extract_hand(
+                image_rgb, frame_index)
 
             if multiple_hands:
                 anomalous_hands.extend(multiple_hands)
@@ -464,9 +472,10 @@ class KeyPointExtractorV2:
             data = json.load(f)
 
         for idx, side in anomalous_hands:
-            data["metadata"].setdefault("simultaneous_hands_frames", []).append(
-                deepcopy(data["frames"][idx])
-            )
+            data["metadata"].setdefault(
+                "simultaneous_hands_frames", []).append(
+                deepcopy(
+                    data["frames"][idx]))
             data["frames"][idx]["hands"][side] = []
 
         with open(filepath, "w") as f:
@@ -520,10 +529,9 @@ class KeyPointExtractorV2:
             Rotated frame, or the original frame if angle is unrecognised.
         """
         rotations = {
-            90:  cv2.ROTATE_90_CLOCKWISE,
+            90: cv2.ROTATE_90_CLOCKWISE,
             180: cv2.ROTATE_180,
             270: cv2.ROTATE_90_COUNTERCLOCKWISE,
         }
         code = rotations.get(angle)
         return cv2.rotate(frame, code) if code is not None else frame
-

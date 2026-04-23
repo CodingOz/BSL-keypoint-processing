@@ -7,6 +7,7 @@ from scipy.stats import gaussian_kde, ks_2samp, norm
 from sklearn.mixture import GaussianMixture
 import matplotlib.pyplot as plt
 
+
 @dataclass
 class MovementAnomalyDetectionResult:
     file_path: str
@@ -14,8 +15,8 @@ class MovementAnomalyDetectionResult:
     frame: list[int]
     # the percentage through based around the first and last hand seen
     percentage_through: list[float]
-    
-    
+
+
 @dataclass
 class AnomalyDistributionResult:
     all_percentages: list[float]
@@ -27,25 +28,26 @@ class AnomalyDistributionResult:
     aic: float
     is_bimodal: bool
 
+
 class CorpusValidator:
     def __init__(self, corpus_path):
         self.corpus_path = corpus_path
         self.validators = []
-        
+
         # dictionary holding 2d array of palm coordinates for each json file
         self.all_palm_locations = {}
-        
+
         # dictionary holding 1d array of palm momentums for each json file
         self.all_palm_momentums = {}
-        
+
         # dictionary holding 1d array of palm accelerations for each json file
         self.all_palm_accelerations = {}
-        
+
         self.timings = []
-        
-        # makes an array of keypoint validators for every json in the corpus        
+
+        # makes an array of keypoint validators for every json in the corpus
         for filename in os.listdir(corpus_path):
-            
+
             if filename.endswith(".json"):
                 filepath = os.path.join(corpus_path, filename)
                 try:
@@ -53,7 +55,7 @@ class CorpusValidator:
                     self.validators.append(temp)
                 except Exception as e:
                     print(f"Error processing {filepath}: {e}")
-            
+
             # loops through any subdirectories
             elif os.path.isdir(os.path.join(corpus_path, filename)):
                 subdir_path = os.path.join(corpus_path, filename)
@@ -66,45 +68,47 @@ class CorpusValidator:
                         except Exception as e:
                             print(f"Error processing {filepath}: {e}")
 
-                    
         print(f"{len(self.validators)} files found in corpus")
-        
+
     def getAllPalmLocations(self):
         ''' checks if palm directory is empty '''
         if len(self.all_palm_locations) > 0:
             return self.all_palm_locations
-        
+
         for validator in self.validators:
-            self.all_palm_locations[validator.filepath] = validator.getFilledPalmCenters()
+            self.all_palm_locations[validator.filepath] = validator.getFilledPalmCenters(
+            )
         return self.all_palm_locations
-    
+
     def getAllPalmMomentums(self):
         ''' checks if palm directory is empty '''
         if len(self.all_palm_momentums) > 0:
             return self.all_palm_momentums
-        
+
         for validator in self.validators:
-            self.all_palm_momentums[validator.filepath] = validator.getEstimatedMomentums()
+            self.all_palm_momentums[validator.filepath] = validator.getEstimatedMomentums(
+            )
         return self.all_palm_momentums
-    
+
     def getAllPalmAccelerations(self):
         ''' checks if palm directory is empty '''
         if len(self.all_palm_accelerations) > 0:
             return self.all_palm_accelerations
-        
+
         for validator in self.validators:
-            self.all_palm_accelerations[validator.filepath] = validator.getEstimatedAccelerations()
+            self.all_palm_accelerations[validator.filepath] = validator.getEstimatedAccelerations(
+            )
         return self.all_palm_accelerations
-    
+
     def getAllTimings(self):
-        ''' returns a list of Sign_lengths dataclasses, one per file in the corpus, 
+        ''' returns a list of Sign_lengths dataclasses, one per file in the corpus,
         containing the first and last frame where a hand is detected '''
         if len(self.timings) > 0:
             return self.timings
         for validator in self.validators:
             self.timings.append(validator.getSignLengths())
         return self.timings
-  
+
     def detectMovementAnomalies(
         self,
         acceleration_threshold: float = 0.2,
@@ -136,8 +140,8 @@ class CorpusValidator:
                 continue  # No timing info available for this file
 
             sign_start = timing.first_hand
-            sign_end   = timing.last_hand
-            sign_span  = sign_end - sign_start  # frames spanning the sign
+            sign_end = timing.last_hand
+            sign_span = sign_end - sign_start  # frames spanning the sign
 
             mom_by_hand = self.all_palm_momentums.get(filepath, {})
 
@@ -146,13 +150,16 @@ class CorpusValidator:
             if isinstance(acc_by_hand, list):
                 acc_map = {'left': [], 'right': []}
                 for item in acc_by_hand:
-                    # item is in form {'acceleration': {'left': {...}, 'right': {...}}}
-                    data = item.get('acceleration') if isinstance(item, dict) else None
+                    # item is in form {'acceleration': {'left': {...}, 'right':
+                    # {...}}}
+                    data = item.get('acceleration') if isinstance(
+                        item, dict) else None
                     for side in ('left', 'right'):
                         val = 0.0
                         if isinstance(data, dict):
                             hand_info = data.get(side, {})
-                            if isinstance(hand_info, dict) and 'acceleration' in hand_info:
+                            if isinstance(
+                                    hand_info, dict) and 'acceleration' in hand_info:
                                 try:
                                     val = float(hand_info['acceleration'])
                                 except Exception:
@@ -168,7 +175,8 @@ class CorpusValidator:
                         val = 0.0
                         if isinstance(item, dict):
                             hand_info = item.get(side, {})
-                            if isinstance(hand_info, dict) and 'magnitude' in hand_info:
+                            if isinstance(
+                                    hand_info, dict) and 'magnitude' in hand_info:
                                 try:
                                     val = float(hand_info['magnitude'])
                                 except Exception:
@@ -189,8 +197,10 @@ class CorpusValidator:
                 percentages: list[float] = []
 
                 for frame_idx in range(n_frames):
-                    acc = acc_values[frame_idx] if frame_idx < len(acc_values) else 0.0
-                    mom = mom_values[frame_idx] if frame_idx < len(mom_values) else 0.0
+                    acc = acc_values[frame_idx] if frame_idx < len(
+                        acc_values) else 0.0
+                    mom = mom_values[frame_idx] if frame_idx < len(
+                        mom_values) else 0.0
 
                     if acc > acceleration_threshold or mom > momentum_threshold:
                         # only record frames within the signed region
@@ -198,7 +208,8 @@ class CorpusValidator:
                             anomalous_frames.append(frame_idx)
 
                             if sign_span > 0:
-                                pct = (frame_idx - sign_start) / sign_span * 100.0
+                                pct = (
+                                    frame_idx - sign_start) / sign_span * 100.0
                             else:
                                 pct = 0.0
 
@@ -215,13 +226,13 @@ class CorpusValidator:
                     )
 
         return results
-    
+
     def analyseAnomalyDistribution(
-        self,
-        anomaly_results: list[MovementAnomalyDetectionResult],
-        max_components: int = 4,
-        plot: bool = True,
-        plot_path: str | None = None,):
+            self,
+            anomaly_results: list[MovementAnomalyDetectionResult],
+            max_components: int = 4,
+            plot: bool = True,
+            plot_path: str | None = None,):
         """
         fits a Gaussian Mixture Model to the distribution of anomaly
         percentage-through values and returns component statistics.
@@ -232,7 +243,7 @@ class CorpusValidator:
             plot: whether to show/save a diagnostic figure
             plot_path: if given, saves figure here instead of showing it
         returns:
-            result of the distribution analisise 
+            result of the distribution analisise
             in the form of a AnomalyDistributionResult class
         """
 
@@ -244,7 +255,8 @@ class CorpusValidator:
         ])
 
         if len(all_pcts) == 0:
-            raise ValueError("No anomaly percentages found — run detect_movement_anomalies() first.")
+            raise ValueError(
+                "No anomaly percentages found — run detect_movement_anomalies() first.")
 
         X = all_pcts.reshape(-1, 1)   # sklearn expects (n_samples, n_features)
 
@@ -270,8 +282,8 @@ class CorpusValidator:
 
         # sort components by mean for consistent output
         order = np.argsort(best_gmm.means_.flatten())
-        means  = best_gmm.means_.flatten()[order].tolist()
-        stds   = np.sqrt(best_gmm.covariances_.flatten())[order].tolist()
+        means = best_gmm.means_.flatten()[order].tolist()
+        stds = np.sqrt(best_gmm.covariances_.flatten())[order].tolist()
         weights = best_gmm.weights_[order].tolist()
 
         is_bimodal = best_n >= 2
@@ -299,30 +311,44 @@ class CorpusValidator:
             for i, (m, s, w) in enumerate(zip(means, stds, weights)):
                 component_density = w * norm.pdf(pct_axis, m, s)
                 gmm_density += component_density
-                ax.fill_between(pct_axis, component_density, alpha=0.25,
-                                color=component_colors[i],
-                                label=f"Component {i+1}: μ={m:.1f}%, σ={s:.1f}%, w={w:.2f}")
+                ax.fill_between(
+                    pct_axis,
+                    component_density,
+                    alpha=0.25,
+                    color=component_colors[i],
+                    label=f"Component {i+1}: μ={m:.1f}%, σ={s:.1f}%, w={w:.2f}")
 
             ax.plot(pct_axis, gmm_density, color="crimson", linewidth=2.5,
                     linestyle="--", label=f"GMM total (k={best_n})")
 
             # annotate suspected regions
             for lo, hi in [(20, 30), (70, 80)]:
-                ax.axvspan(lo, hi, alpha=0.08, color="gold",
-                        label=f"Suspected zone {lo}–{hi}%" if lo == 20 else "")
+                ax.axvspan(
+                    lo,
+                    hi,
+                    alpha=0.08,
+                    color="gold",
+                    label=f"Suspected zone {lo}–{hi}%" if lo == 20 else "")
 
             ax.set_xlabel("Percentage through sign (%)")
             ax.set_ylabel("Density")
-            ax.set_title(f"Anomaly Distribution  (n={len(all_pcts):,} frames, best k={best_n})")
+            ax.set_title(
+                f"Anomaly Distribution  (n={len(all_pcts):,} frames, best k={best_n})")
             ax.legend(fontsize=8)
             ax.set_xlim(0, 100)
 
             # BIC/AIC vs number of components —
             ax2 = axes[1]
             ns = list(bic_scores.keys())
-            ax2.plot(ns, [bic_scores[n] for n in ns], "o-", label="BIC", color="crimson")
-            ax2.plot(ns, [aic_scores[n] for n in ns], "s--", label="AIC", color="steelblue")
-            ax2.axvline(best_n, color="gray", linestyle=":", label=f"Selected k={best_n}")
+            ax2.plot(ns, [bic_scores[n]
+                     for n in ns], "o-", label="BIC", color="crimson")
+            ax2.plot(ns, [aic_scores[n]
+                     for n in ns], "s--", label="AIC", color="steelblue")
+            ax2.axvline(
+                best_n,
+                color="gray",
+                linestyle=":",
+                label=f"Selected k={best_n}")
             ax2.set_xlabel("Number of GMM components")
             ax2.set_ylabel("Score (lower = better)")
             ax2.set_title("Model Selection: BIC / AIC")
@@ -339,16 +365,19 @@ class CorpusValidator:
         # summary
         print(f"\n Anomaly Distribution Analysis ")
         print(f"  Total anomalous frames : {len(all_pcts):,}")
-        print(f"  Best GMM k             : {best_n}  (BIC={bic_scores[best_n]:.1f})")
+        print(
+            f"  Best GMM k             : {best_n}  (BIC={bic_scores[best_n]:.1f})")
         print(f"  Bimodal?               : {is_bimodal}")
         for i, (m, s, w) in enumerate(zip(means, stds, weights)):
-            print(f"  Component {i+1}           : μ={m:.2f}%  σ={s:.2f}%  weight={w:.3f}")
+            print(
+                f"  Component {i+1}           : μ={m:.2f}%  σ={s:.2f}%  weight={w:.3f}")
 
         # check overlap with suspected zones
         for lo, hi in [(20, 30), (70, 80)]:
             zone_pcts = all_pcts[(all_pcts >= lo) & (all_pcts <= hi)]
             zone_share = len(zone_pcts) / len(all_pcts) * 100
-            print(f"  Anomalies in {lo}-{hi}%    : {len(zone_pcts):,}  ({zone_share:.1f}% of total)")
+            print(
+                f"  Anomalies in {lo}-{hi}%    : {len(zone_pcts):,}  ({zone_share:.1f}% of total)")
         print()
 
         return AnomalyDistributionResult(
@@ -361,11 +390,11 @@ class CorpusValidator:
             aic=aic_scores[best_n],
             is_bimodal=is_bimodal,
         )
-        
+
     def getAllHandDistances(self, midpoint=0.5) -> dict:
         """
         Returns fixed-midpoint distances for every file in the corpus.
-        
+
         Returns:
             {
                 filepath: list[{'left': float|None, 'right': float|None}]  # one dict per frame
@@ -382,7 +411,6 @@ class CorpusValidator:
                 validator.findAllHandDistancesFromMidpoint(midpoint=midpoint)
 
         return self._all_hand_distances
-
 
     def getAllAdaptiveDistances(self) -> dict:
         """
@@ -405,9 +433,8 @@ class CorpusValidator:
         for validator in self.validators:
             distances, midpoint = validator.findAllHandDistancesFromAdaptiveMidpoint()
             self._all_adaptive_distances[validator.filepath] = {
-                'distances':         distances,
+                'distances': distances,
                 'adaptive_midpoint': midpoint
             }
 
         return self._all_adaptive_distances
-

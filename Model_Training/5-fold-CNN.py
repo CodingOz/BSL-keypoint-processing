@@ -1,5 +1,5 @@
 """
-1D CNN with Stratified K-Fold Cross-Validation for BSL Sign Classification. 
+1D CNN with Stratified K-Fold Cross-Validation for BSL Sign Classification.
 Architecture: 1D convolutions along the temporal axis (10 frames).
 Features are treated as input channels, time as the spatial dimension.
 """
@@ -14,6 +14,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import classification_report, confusion_matrix
 import copy
 import os
+
 
 class BSLDataset(Dataset):
     """BSL sign language dataset with optional on-the-fly augmentation."""
@@ -47,7 +48,7 @@ class BSLDataset(Dataset):
 
             # Random temporal shift
             shift = np.random.randint(-self.time_shift_max,
-                                       self.time_shift_max + 1)
+                                      self.time_shift_max + 1)
             if shift != 0:
                 x = torch.roll(x, shifts=shift, dims=-1)
 
@@ -174,7 +175,8 @@ def evaluate(model, loader, criterion, device):
         all_preds.extend(preds.cpu().numpy())
         all_labels.extend(y.cpu().numpy())
 
-    return total_loss / total, correct / total, np.array(all_preds), np.array(all_labels)
+    return total_loss / total, correct / \
+        total, np.array(all_preds), np.array(all_labels)
 
 
 def load_corpus(path):
@@ -241,7 +243,8 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
     print(f"Corpus: {os.path.basename(os.path.dirname(corpus_path))}")
     print(f"Samples: {n_samples}  |  Frames: {n_frames}  |  "
           f"Features/frame: {n_feats}  |  Classes: {n_classes}")
-    print(f"Class distribution: {dict(zip(*np.unique(y_raw, return_counts=True)))}")
+    print(
+        f"Class distribution: {dict(zip(*np.unique(y_raw, return_counts=True)))}")
     print(f"Model input shape: (batch, {n_feats}, {n_frames})")
     print(f"Augmentation: {'ON' if augment else 'OFF'}")
     print("=" * 70)
@@ -255,7 +258,8 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
 
     for fold, (train_idx, val_idx) in enumerate(skf.split(X_all, y_encoded)):
         print(f"\n{'─' * 30} Fold {fold + 1}/{n_folds} {'─' * 30}")
-        print(f"Train: {len(train_idx)} samples  |  Val: {len(val_idx)} samples")
+        print(
+            f"Train: {len(train_idx)} samples  |  Val: {len(val_idx)} samples")
 
         # prepare data
         X_train, X_val = prepare_fold(X_all, y_encoded, train_idx, val_idx)
@@ -264,8 +268,11 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         train_ds = BSLDataset(X_train, y_train, augment=augment)
         val_ds = BSLDataset(X_val, y_val, augment=False)
 
-        train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                                  drop_last=False)
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            shuffle=True,
+            drop_last=False)
         val_loader = DataLoader(val_ds, batch_size=len(val_idx))
 
         # build model
@@ -294,12 +301,14 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
                 best_val_acc = val_acc
 
             if epoch % 25 == 0 or epoch == 1:
-                print(f"  Epoch {epoch:3d}  "
-                      f"train_loss={train_loss:.4f}  train_acc={train_acc:.3f}  "
-                      f"val_loss={val_loss:.4f}  val_acc={val_acc:.3f}")
+                print(
+                    f"  Epoch {epoch:3d}  "
+                    f"train_loss={train_loss:.4f}  train_acc={train_acc:.3f}  "
+                    f"val_loss={val_loss:.4f}  val_acc={val_acc:.3f}")
 
             if stopper.step(val_loss, model):
-                print(f"  Early stop at epoch {epoch}  (best val_loss={stopper.best_loss:.4f})")
+                print(
+                    f"  Early stop at epoch {epoch}  (best val_loss={stopper.best_loss:.4f})")
                 break
 
         # Evaluate best model for this fold
@@ -319,7 +328,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         })
 
         print(f"\n  Fold {fold + 1} result: val_acc = {final_acc:.3f}")
-
 
     print("\n" + "=" * 70)
     print("CROSS-VALIDATION RESULTS")

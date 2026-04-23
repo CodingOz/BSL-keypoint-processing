@@ -36,9 +36,9 @@ class SpatialNormalisor:
       { metadata, normalisation, frames: [ { frame_index, timestamp,
         hands: { left: [{landmark_id, x, y}, ...], right: [...] } } ] }
     """
-    _WRIST_ID     = 0   # landmark 0 — wrist
-    _MID_TIP_ID   = 12  # landmark 12 — middle fingertip
-    
+    _WRIST_ID = 0   # landmark 0 — wrist
+    _MID_TIP_ID = 12  # landmark 12 — middle fingertip
+
     def normalise(self, source_path, target_path):
         """
         Apply the full spatial normalisation (translation + scale) to a single
@@ -51,9 +51,9 @@ class SpatialNormalisor:
         Returns:
             dict: the output structure written to target_path.
         """
-        data        = self._load(source_path)
+        data = self._load(source_path)
         frames_out, audit = self._normalise_frames(data['frames'])
-        output      = self._build_output(data, frames_out, audit)
+        output = self._build_output(data, frames_out, audit)
         self._save(output, target_path)
         return output
 
@@ -76,28 +76,30 @@ class SpatialNormalisor:
 
         paths = sorted(source_dir.rglob('*.json'))
         if not paths:
-            print(f"[SpatialNormalisation] No JSON files found in {source_dir}")
+            print(
+                f"[SpatialNormalisation] No JSON files found in {source_dir}")
             return []
 
         results = []
         for src in paths:
             # Preserve relative directory structure in target
             relative_path = src.relative_to(source_dir)
-            tgt      = target_dir / relative_path
+            tgt = target_dir / relative_path
             tgt.parent.mkdir(parents=True, exist_ok=True)
             try:
                 self.normalise(str(src), str(tgt))
                 results.append({'source': str(src), 'target': str(tgt),
-                                 'success': True,  'error': None})
+                                'success': True, 'error': None})
                 print(f"success: {relative_path}")
             except Exception as e:
                 results.append({'source': str(src), 'target': str(tgt),
-                                 'success': False, 'error': str(e)})
+                                'success': False, 'error': str(e)})
                 print(f"failed: {relative_path}  —  {e}")
 
-        n_ok  = sum(1 for r in results if r['success'])
+        n_ok = sum(1 for r in results if r['success'])
         n_err = len(results) - n_ok
-        print(f"\n[SpatialNormalisation] Done: {n_ok} succeeded, {n_err} failed.")
+        print(
+            f"\n[SpatialNormalisation] Done: {n_ok} succeeded, {n_err} failed.")
         return results
 
     def transform(self, source_path, target_path):
@@ -112,7 +114,7 @@ class SpatialNormalisor:
         Returns:
             dict: the output structure written to target_path.
         """
-        data   = self._load(source_path)
+        data = self._load(source_path)
         frames_out, audit = self._translate_frames(data['frames'])
         output = self._build_output(data, frames_out, audit)
         self._save(output, target_path)
@@ -130,13 +132,13 @@ class SpatialNormalisor:
         Returns:
             dict: the output structure written to target_path.
         """
-        data   = self._load(source_path)
+        data = self._load(source_path)
         frames_out, audit = self._scale_frames(data['frames'])
         output = self._build_output(data, frames_out, audit)
         self._save(output, target_path)
         return output
 
-    # ── private helpers ───────────────────────────────────────────────────────
+    # ── private helpers ─────────────────────────────────────────────────────
 
     @staticmethod
     def _load(path):
@@ -167,19 +169,19 @@ class SpatialNormalisor:
             origin
             shared_scale
             scale_left
-            scale_right 
+            scale_right
         """
         W = self._WRIST_ID
         M = self._MID_TIP_ID
 
-        left_wrist  = np.array([left_lms[W]['x'],  left_lms[W]['y']])
+        left_wrist = np.array([left_lms[W]['x'], left_lms[W]['y']])
         right_wrist = np.array([right_lms[W]['x'], right_lms[W]['y']])
-        left_mid    = np.array([left_lms[M]['x'],  left_lms[M]['y']])
-        right_mid   = np.array([right_lms[M]['x'], right_lms[M]['y']])
+        left_mid = np.array([left_lms[M]['x'], left_lms[M]['y']])
+        right_mid = np.array([right_lms[M]['x'], right_lms[M]['y']])
 
-        origin       = (left_wrist + right_wrist) / 2.0
-        scale_left   = float(np.linalg.norm(left_mid  - left_wrist))
-        scale_right  = float(np.linalg.norm(right_mid - right_wrist))
+        origin = (left_wrist + right_wrist) / 2.0
+        scale_left = float(np.linalg.norm(left_mid - left_wrist))
+        scale_right = float(np.linalg.norm(right_mid - right_wrist))
         shared_scale = (scale_left + scale_right) / 2.0
 
         return origin, shared_scale, scale_left, scale_right
@@ -189,7 +191,7 @@ class SpatialNormalisor:
         Apply translation + scale in a single pass (most efficient).
         Returns (frames_out, audit_dict).
         """
-        frames_out   = []
+        frames_out = []
         frame_scales = []
 
         for frame in raw_frames:
@@ -201,14 +203,14 @@ class SpatialNormalisor:
 
             frame_out = {
                 'frame_index': frame['frame_index'],
-                'timestamp':   frame['timestamp'],
+                'timestamp': frame['timestamp'],
                 'hands': {'left': [], 'right': []}
             }
 
             for side, lms_dict in (('left', left_lms), ('right', right_lms)):
                 for lm_id in range(21):
                     lm = lms_dict[lm_id]
-                    p  = np.array([lm['x'], lm['y']])
+                    p = np.array([lm['x'], lm['y']])
                     p_norm = (p - origin) / shared_scale
                     frame_out['hands'][side].append({
                         'landmark_id': lm_id,
@@ -219,14 +221,14 @@ class SpatialNormalisor:
             frames_out.append(frame_out)
 
         audit = {
-            'method':  'inter_wrist_midpoint_shared_scale',
-            'origin':  'midpoint of left and right wrist (landmark 0)',
-            'scale':   'mean of left and right wrist-to-middle-fingertip '
-                       '(landmark 12) distances; single shared divisor for '
-                       'both hands to preserve inter-hand geometry',
+            'method': 'inter_wrist_midpoint_shared_scale',
+            'origin': 'midpoint of left and right wrist (landmark 0)',
+            'scale': 'mean of left and right wrist-to-middle-fingertip '
+            '(landmark 12) distances; single shared divisor for '
+            'both hands to preserve inter-hand geometry',
             'mean_frame_scale': round(float(np.mean(frame_scales)), 6),
-            'min_frame_scale':  round(float(np.min(frame_scales)),  6),
-            'max_frame_scale':  round(float(np.max(frame_scales)),  6),
+            'min_frame_scale': round(float(np.min(frame_scales)), 6),
+            'max_frame_scale': round(float(np.max(frame_scales)), 6),
         }
         return frames_out, audit
 
@@ -239,13 +241,13 @@ class SpatialNormalisor:
 
             frame_out = {
                 'frame_index': frame['frame_index'],
-                'timestamp':   frame['timestamp'],
+                'timestamp': frame['timestamp'],
                 'hands': {'left': [], 'right': []}
             }
             for side, lms_dict in (('left', left_lms), ('right', right_lms)):
                 for lm_id in range(21):
                     lm = lms_dict[lm_id]
-                    p  = np.array([lm['x'], lm['y']]) - origin
+                    p = np.array([lm['x'], lm['y']]) - origin
                     frame_out['hands'][side].append({
                         'landmark_id': lm_id,
                         'x': round(float(p[0]), 8),
@@ -263,7 +265,7 @@ class SpatialNormalisor:
         Expects frames that have already been translated (wrists symmetric
         around zero), but works correctly on raw frames too.
         """
-        frames_out   = []
+        frames_out = []
         frame_scales = []
 
         for frame in raw_frames:
@@ -273,7 +275,7 @@ class SpatialNormalisor:
 
             frame_out = {
                 'frame_index': frame['frame_index'],
-                'timestamp':   frame['timestamp'],
+                'timestamp': frame['timestamp'],
                 'hands': {'left': [], 'right': []}
             }
             for side, lms_dict in (('left', left_lms), ('right', right_lms)):
@@ -287,11 +289,11 @@ class SpatialNormalisor:
             frames_out.append(frame_out)
 
         audit = {
-            'method':           'scale_only',
-            'scale':            'mean of wrist-to-middle-fingertip distances',
+            'method': 'scale_only',
+            'scale': 'mean of wrist-to-middle-fingertip distances',
             'mean_frame_scale': round(float(np.mean(frame_scales)), 6),
-            'min_frame_scale':  round(float(np.min(frame_scales)),  6),
-            'max_frame_scale':  round(float(np.max(frame_scales)),  6),
+            'min_frame_scale': round(float(np.min(frame_scales)), 6),
+            'max_frame_scale': round(float(np.max(frame_scales)), 6),
         }
         return frames_out, audit
 
@@ -301,10 +303,10 @@ class SpatialNormalisor:
         Assemble the output dict, preserving all upstream audit blocks.
         """
         output = {
-            'metadata':             source_data.get('metadata', {}),
-            'normalisation':        source_data.get('normalisation', {}),
+            'metadata': source_data.get('metadata', {}),
+            'normalisation': source_data.get('normalisation', {}),
             'spatial_normalisation': spatial_audit,
-            'frames':               frames_out,
+            'frames': frames_out,
         }
         # If the source already had a spatial_normalisation block, stack it
         # so the history is never silently overwritten.

@@ -1,8 +1,18 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QPushButton,
-    QLabel, QVBoxLayout, QHBoxLayout, QListWidget,
-    QListWidgetItem, QFileDialog, QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QComboBox
-)
+    QMainWindow,
+    QWidget,
+    QPushButton,
+    QLabel,
+    QVBoxLayout,
+    QHBoxLayout,
+    QListWidget,
+    QListWidgetItem,
+    QFileDialog,
+    QCheckBox,
+    QSlider,
+    QSpinBox,
+    QDoubleSpinBox,
+    QComboBox)
 from PySide6.QtCore import Qt, Signal
 import os
 
@@ -22,11 +32,11 @@ class MainWindow(QMainWindow):
         self.pause_button = QPushButton("Pause")
         self.frame_label = QLabel("Frame: 0")
         self.browse_button = QPushButton("Browse Directory")
-        
+
         # frame navigation buttons
         self.prev_button = QPushButton("< Previous")
         self.next_button = QPushButton("Next >")
-        
+
         # frame selection spinbox
         self.frame_spinbox = QSpinBox()
         self.frame_spinbox.setMinimum(0)
@@ -40,7 +50,7 @@ class MainWindow(QMainWindow):
         self.show_left_cb.setChecked(True)
         self.show_right_cb.setChecked(True)
         self.show_pose_cb.setChecked(True)
-        
+
         # palm visibility dropdown
         self.palm_mode_combo = QComboBox()
         self.palm_mode_combo.addItems([
@@ -99,38 +109,41 @@ class MainWindow(QMainWindow):
 
         # file list panel on the right
         self.file_list = QListWidget()
-        self.file_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        
+        self.file_list.setSelectionMode(
+            QListWidget.SelectionMode.MultiSelection)
+
         file_panel = QVBoxLayout()
         file_panel.addWidget(QLabel("JSON Files:"))
         file_panel.addWidget(self.file_list)
 
         # graph on left, controls below, file list on right
         main_layout = QHBoxLayout()
-        
+
         left_layout = QVBoxLayout()
         left_layout.addWidget(graph_view)
         left_layout.addLayout(controls)
-        
+
         main_layout.addLayout(left_layout, 3)  # 3 for graph
         main_layout.addLayout(file_panel, 1)   # 1 for file list
 
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
-        
+
         self.file_list.itemChanged.connect(self._on_file_selection_changed)
         self.browse_button.clicked.connect(self._on_browse_directory)
-        
+
         self.show_left_cb.stateChanged.connect(self._on_cluster_filters)
         self.show_right_cb.stateChanged.connect(self._on_cluster_filters)
         self.show_pose_cb.stateChanged.connect(self._on_cluster_filters)
-        
-        self.palm_mode_combo.currentTextChanged.connect(self._on_palm_mode_changed)
+
+        self.palm_mode_combo.currentTextChanged.connect(
+            self._on_palm_mode_changed)
 
     def _on_browse_directory(self):
         """open directory dialog and populate file list"""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory with JSON Files")
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select Directory with JSON Files")
         if directory:
             self.set_directory(directory)
 
@@ -139,10 +152,10 @@ class MainWindow(QMainWindow):
         import os
         self.current_directory = directory
         self.file_list.clear()
-        
+
         json_files = [f for f in os.listdir(directory) if f.endswith('.json')]
         json_files.sort()
-        
+
         for file in json_files:
             item = QListWidgetItem(file)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
@@ -153,14 +166,14 @@ class MainWindow(QMainWindow):
         """handle file selection/deselection changes"""
         if not self.data_model or not self.current_directory:
             return
-        
+
         for i in range(self.file_list.count()):
             item = self.file_list.item(i)
             filepath = os.path.join(self.current_directory, item.text())
-            
+
             is_checked = item.checkState() == Qt.CheckState.Checked
             currently_loaded = item.text() in self.data_model.get_loaded_files()
-            
+
             if is_checked and not currently_loaded:
                 self.data_model.load_from_json(filepath, add=True)
             elif not is_checked and currently_loaded:
@@ -196,12 +209,12 @@ class MainWindow(QMainWindow):
         self.speed_label.setText(f"Speed: {speed:.2f}x")
         if hasattr(self, 'playback') and self.playback is not None:
             self.playback.set_speed(speed)
-    
+
     def _on_frame_spinbox_changed(self, value):
         """handle frame spinbox value changes"""
         if hasattr(self, 'playback') and self.playback is not None:
             self.playback.set_frame(value)
-    
+
     def update_frame_display(self, frame_index):
         """update frame display label and spinbox without triggering spinbox signal"""
         self.frame_label.setText(f"Frame: {frame_index}")
@@ -209,7 +222,7 @@ class MainWindow(QMainWindow):
         self.frame_spinbox.blockSignals(True)
         self.frame_spinbox.setValue(frame_index)
         self.frame_spinbox.blockSignals(False)
-    
+
     def _on_palm_mode_changed(self, mode_text):
         """handle palm mode dropdown selection change"""
         # map dropdown text to internal mode names
@@ -220,32 +233,32 @@ class MainWindow(QMainWindow):
             "Cubic Spline": "cubic_spline",
             "PCHIP": "pchip"
         }
-        
+
         palm_mode = mode_map.get(mode_text, None)
-        
+
         # load the specified palm type for all loaded files if not 'None'
         if palm_mode and self.data_model and self.current_directory:
             for i in range(self.file_list.count()):
                 item = self.file_list.item(i)
                 if item.checkState() == Qt.CheckState.Checked:
-                    filepath = os.path.join(self.current_directory, item.text())
+                    filepath = os.path.join(
+                        self.current_directory, item.text())
                     try:
                         self.data_model.load_palm_centers_by_type(
-                            filepath, 
-                            item.text(), 
-                            palm_mode,
-                            self.data_model.loaded_files.get(item.text(), 'gray')
-                        )
+                            filepath, item.text(), palm_mode, self.data_model.loaded_files.get(
+                                item.text(), 'gray'))
                     except Exception as e:
-                        print(f"Error loading {mode_text} palms for {item.text()}: {e}")
-        
+                        print(
+                            f"Error loading {mode_text} palms for {item.text()}: {e}")
+
         self.palm_mode_changed.emit(palm_mode)
         if hasattr(self, 'data_model'):
             self.data_model.set_palm_mode(palm_mode)
-    
+
     def get_directory_from_user(self):
         """show directory picker on startup"""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory with JSON Files")
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select Directory with JSON Files")
         if directory:
             self.set_directory(directory)
         return directory
