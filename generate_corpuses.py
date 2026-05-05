@@ -1,7 +1,7 @@
 import os
 import json
 import numpy as np
-from feature_extraction import FeatureExraction
+from feature_extraction import FeatureExtraction
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -75,8 +75,8 @@ class CorpusFeatureGenerator:
 
         output_path = self.create_output_directory(corpus_name)
 
-        # Create a dummy FeatureExraction instance
-        fe = FeatureExraction.__new__(FeatureExraction)
+        # Create a dummy FeatureExtraction instance
+        fe = FeatureExtraction.__new__(FeatureExtraction)
 
         corpus_data = []
 
@@ -189,7 +189,7 @@ class CorpusFeatureGenerator:
             print("-" * 70)
 
             method_name = corpus_config['method']
-            method = getattr(FeatureExraction, method_name)
+            method = getattr(FeatureExtraction, method_name)
 
             result = self.extract_and_save_corpus(
                 corpus_config['name'],
@@ -216,13 +216,13 @@ class CorpusFeatureGenerator:
 
 if __name__ == '__main__':
     # Update these paths
-    base_corpus_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\keypoints_V1_cleaned_interpolated_cropped_time_and_space_normilsied'
+    base_corpus_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\All_keypoint_data\keypoints_V1_s5_space_norm'
     output_base_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\feature_corpuses_V1'
 
     generator = CorpusFeatureGenerator(base_corpus_path, output_base_path)
     generator.generate_all_corpuses()
-
-    base_corpus_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\keypoints_V2_cleaned_interpolated_cropped_time_and_space_normilsied'
+    
+    base_corpus_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\All_keypoint_data\keypoints_V2_s5_space_norm'
     output_base_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\feature_corpuses_V2'
 
     generator = CorpusFeatureGenerator(base_corpus_path, output_base_path)
