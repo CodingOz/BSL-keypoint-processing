@@ -1,0 +1,18 @@
+{
+  "corpus_name": "v6_minimal_index_palm_pinkie_850",
+  "total_files": 327,
+  "features_per_file": 850,
+  "signs": [
+    "A",
+    "O",
+    "I",
+    "N",
+    "S",
+    "E",
+    "T",
+    "J",
+    "B",
+    "P",
+    "U"
+  ]
+}

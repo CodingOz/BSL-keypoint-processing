@@ -1,0 +1,18 @@
+{
+  "corpus_name": "v4_12points_angles_and_distance_850",
+  "total_files": 327,
+  "features_per_file": 850,
+  "signs": [
+    "N",
+    "S",
+    "O",
+    "B",
+    "E",
+    "J",
+    "U",
+    "P",
+    "I",
+    "T",
+    "A"
+  ]
+}

@@ -55,7 +55,7 @@ class DataCleaner:
             tuple of lists: (anomaly_frames_left, anomaly_frames_right)
         '''
         anomaly_frames_left, anomaly_frames_right = \
-            self.anomaly_detector.position_and_filled_movement_and_acceleration_anomalys(
+            self.anomaly_detector.positionAndFilledMovementAndAccelerationAnomalies(
                 movement_threshold=0.11,
                 position_threshold=-0.08,
                 gap_size=4

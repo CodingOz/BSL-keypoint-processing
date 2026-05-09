@@ -215,15 +215,8 @@ class CorpusFeatureGenerator:
 
 
 if __name__ == '__main__':
-    # Update these paths
-    base_corpus_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\All_keypoint_data\keypoints_V1_s5_space_norm'
-    output_base_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\feature_corpuses_V1'
-
-    generator = CorpusFeatureGenerator(base_corpus_path, output_base_path)
-    generator.generate_all_corpuses()
-    
-    base_corpus_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\All_keypoint_data\keypoints_V2_s5_space_norm'
-    output_base_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\feature_corpuses_V2'
+    base_corpus_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\All_keypoint_data\keypoints_V2_s4_time_norm'
+    output_base_path = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\features\feature_corpuses_V2_without_spacal_norm'
 
     generator = CorpusFeatureGenerator(base_corpus_path, output_base_path)
     generator.generate_all_corpuses()

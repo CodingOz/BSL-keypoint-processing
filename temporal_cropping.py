@@ -606,7 +606,7 @@ class TemporalCropping:
                           for momentum in momentums]
         hand_scales = validator.getHandScales()
 
-        phases = self.segment_sign_phases(
+        phases = self.segmentSignPhases(
             palm_distances,
             left_momentum,
             right_momentum,

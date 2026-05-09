@@ -1,0 +1,18 @@
+{
+  "corpus_name": "v2_proximity_only_8610",
+  "total_files": 327,
+  "features_per_file": 8610,
+  "signs": [
+    "A",
+    "O",
+    "I",
+    "N",
+    "S",
+    "E",
+    "T",
+    "J",
+    "B",
+    "P",
+    "U"
+  ]
+}

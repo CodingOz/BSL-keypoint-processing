@@ -2,16 +2,32 @@
 Sweep harness for the BSL feature-set evaluation.
 
 Drives 5-fold-CNN.py across the experimental matrix and appends every result
-to a single results.jsonl file. Designed to be re-runnable: by default it skips
-any (feature_set x keypoint_version x pipeline_config x augment x seed) combo
-that already has a record in results.jsonl, so a crash mid-sweep doesn't cost
-the runs that already finished.
+to a single results.jsonl file.  Re-runnable: by default it skips any
+(feature_set x keypoint_version x pipeline_config x augment x seed) combo
+already present in results.jsonl.
 
-Usage examples:
+Pipeline-stage taxonomy
+-----------------------
+The six pipeline stages decompose into two categories:
+
+* Structural prerequisites: cleaning_10finger, interpolation,
+  temporal_normalisation.  Removing any of these breaks the CNN's fixed-
+  shape input contract (NaNs in the tensor, malformed per-hand feature
+  vectors, or variable-length sequences).  Their contribution is justified
+  theoretically rather than by ablation.
+
+* Quality enhancers: cleaning_mislabel, temporal_cropping,
+  spatial_normalisation.  The pipeline runs without each of these; the
+  data the CNN sees is simply dirtier.  These are the stages that admit
+  empirical ablation, and the corpora for each ablation are pre-generated
+  under feature_corpuses_V2_without_<stage>/.
+
+Usage examples
+--------------
     python run_sweep.py --mode main
-    python run_sweep.py --mode stage_ablation --feature_set v7
-    python run_sweep.py --mode aug_ablation --feature_set v7
-    python run_sweep.py --mode stability --feature_set v7 --feature_set v5
+    python run_sweep.py --mode stage_ablation
+    python run_sweep.py --mode aug_ablation
+    python run_sweep.py --mode seed_stability
     python run_sweep.py --mode all
 """
 import argparse
@@ -22,21 +38,22 @@ import sys
 from itertools import product
 
 # ---------------------------------------------------------------------------
-# Configuration: paths and the experimental matrix.
-# Edit the two CORPUS_ROOT_* paths to match your filesystem.
+# Configuration: corpus roots and the experimental matrix.
+# Update these paths to match your filesystem.
 # ---------------------------------------------------------------------------
 
-CORPUS_ROOT_V1 = (
-    r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing'
-    r'\features\feature_corpuses_V1'
-)
-CORPUS_ROOT_V2 = (
-    r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing'
-    r'\features\feature_corpuses_V2'
+_FEATURES_BASE = (
+    r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\features'
 )
 
+CORPUS_ROOT_V1                 = os.path.join(_FEATURES_BASE, 'feature_corpuses_V1')
+CORPUS_ROOT_V2_FULL            = os.path.join(_FEATURES_BASE, 'feature_corpuses_V2')
+CORPUS_ROOT_V2_NO_MISLABEL     = os.path.join(_FEATURES_BASE, 'feature_corpuses_V2_without_cleaning')
+CORPUS_ROOT_V2_NO_CROPPING     = os.path.join(_FEATURES_BASE, 'feature_corpuses_V2_without_cropping')
+CORPUS_ROOT_V2_NO_SPATIAL_NORM = os.path.join(_FEATURES_BASE, 'feature_corpuses_V2_without_spacal_norm')
+
 # Map short feature_set IDs to the corpus folder name produced by
-# generate_corpuses.py. Update if you ever rename the folders.
+# generate_corpuses.py. Update if the folders are ever renamed.
 FEATURE_SET_FOLDERS = {
     'v0': 'v0_raw_coordinates_840',
     'v1': 'v1_all_proximity_and_angles_9090',
@@ -50,9 +67,9 @@ FEATURE_SET_FOLDERS = {
 
 ALL_FEATURE_SETS = list(FEATURE_SET_FOLDERS.keys())
 
-# Pipeline stages, in the order they appear in formalProcessingPipeline.py.
-# Used by stage-ablation runs.
-PIPELINE_STAGES = [
+# All six pipeline stages, in the order they appear in the formal pipeline.
+# Used only to construct full-pipeline pipeline_config dicts.
+ALL_PIPELINE_STAGES = [
     'cleaning_10finger',
     'cleaning_mislabel',
     'interpolation',
@@ -61,7 +78,24 @@ PIPELINE_STAGES = [
     'spatial_normalisation',
 ]
 
-DEFAULT_PIPELINE = {stage: True for stage in PIPELINE_STAGES}
+# Stages whose contribution can be measured by ablation. The other three
+# are structural prerequisites of the CNN and are not ablatable.
+ABLATABLE_STAGES = [
+    'cleaning_mislabel',
+    'temporal_cropping',
+    'spatial_normalisation',
+]
+
+# Map an ablated-stage name to the corpus root that contains the corpora
+# generated with that stage disabled. Stage ablation is only available for
+# V2 keypoints; V1 has only the full-pipeline corpus.
+V2_ABLATION_ROOTS = {
+    'cleaning_mislabel':     CORPUS_ROOT_V2_NO_MISLABEL,
+    'temporal_cropping':     CORPUS_ROOT_V2_NO_CROPPING,
+    'spatial_normalisation': CORPUS_ROOT_V2_NO_SPATIAL_NORM,
+}
+
+DEFAULT_PIPELINE = {stage: True for stage in ALL_PIPELINE_STAGES}
 
 CNN_SCRIPT = '5-fold-CNN.py'
 RESULTS_FILE = 'results.jsonl'
@@ -71,10 +105,51 @@ RESULTS_FILE = 'results.jsonl'
 # Helpers
 # ---------------------------------------------------------------------------
 
-def corpus_path(feature_set, keypoint_version):
-    """Resolve the corpus_data.json path for a (feature_set, kp_version) pair."""
-    root = CORPUS_ROOT_V1 if keypoint_version == 'V1' else CORPUS_ROOT_V2
+def _identify_ablation(pipeline_config):
+    """Return the single ablated stage name, or None if pipeline is full.
+
+    Raises ValueError if more than one ablatable stage is disabled, or if
+    a structural-prerequisite stage is disabled (which the corpora do not
+    support).
+    """
+    disabled = [s for s in ALL_PIPELINE_STAGES if not pipeline_config.get(s, True)]
+    if not disabled:
+        return None
+    structural = [s for s in disabled if s not in ABLATABLE_STAGES]
+    if structural:
+        raise ValueError(
+            f"Cannot ablate structural prerequisite stage(s): {structural}. "
+            f"Only {ABLATABLE_STAGES} are ablatable.")
+    if len(disabled) > 1:
+        raise ValueError(
+            f"Multiple stages disabled: {disabled}. Only one ablation per run "
+            f"is supported.")
+    return disabled[0]
+
+
+def corpus_path(feature_set, keypoint_version, pipeline_config):
+    """Resolve the corpus_data.json path for a (fs, kp_version, config) triple.
+
+    For V1: only the full-pipeline corpus exists; raises if any stage is
+    disabled.
+    For V2: routes to the matching ablation corpus when exactly one
+    ablatable stage is disabled, otherwise to the full V2 corpus.
+    """
     folder = FEATURE_SET_FOLDERS[feature_set]
+    ablated = _identify_ablation(pipeline_config)
+
+    if keypoint_version == 'V1':
+        if ablated is not None:
+            raise ValueError(
+                f"V1 stage-ablation corpora do not exist; cannot ablate "
+                f"{ablated} on V1.")
+        root = CORPUS_ROOT_V1
+    elif keypoint_version == 'V2':
+        root = (V2_ABLATION_ROOTS[ablated] if ablated is not None
+                else CORPUS_ROOT_V2_FULL)
+    else:
+        raise ValueError(f"Unknown keypoint_version: {keypoint_version}")
+
     return os.path.join(root, folder, 'corpus_data.json')
 
 
@@ -107,7 +182,12 @@ def already_run(records, feature_set, keypoint_version, pipeline_config,
 def run_one(feature_set, keypoint_version, pipeline_config, augment, seed,
             notes='', extra_args=None, dry_run=False):
     """Invoke the CNN script for a single (filtered) configuration."""
-    path = corpus_path(feature_set, keypoint_version)
+    try:
+        path = corpus_path(feature_set, keypoint_version, pipeline_config)
+    except ValueError as e:
+        print(f"  [skip] {e}")
+        return False
+
     if not os.path.exists(path) and not dry_run:
         print(f"  [skip] corpus missing: {path}")
         return False
@@ -121,7 +201,9 @@ def run_one(feature_set, keypoint_version, pipeline_config, augment, seed,
     ]
     if not augment:
         cmd.append('--no_augment')
-    for stage in PIPELINE_STAGES:
+    # Pass --no_<stage> for each disabled stage so the recorded
+    # pipeline_config in the result reflects what was actually run.
+    for stage in ALL_PIPELINE_STAGES:
         if not pipeline_config.get(stage, True):
             cmd.append(f'--no_{stage}')
     if notes:
@@ -137,6 +219,10 @@ def run_one(feature_set, keypoint_version, pipeline_config, augment, seed,
     return result.returncode == 0
 
 
+# ---------------------------------------------------------------------------
+# Run-set generators
+# ---------------------------------------------------------------------------
+
 def iter_main_matrix(feature_sets, keypoint_versions, seeds):
     """Yield the main feature-set x kp-version x seed runs (full pipeline, aug ON)."""
     for fs, kv, seed in product(feature_sets, keypoint_versions, seeds):
@@ -150,26 +236,19 @@ def iter_main_matrix(feature_sets, keypoint_versions, seeds):
         }
 
 
-def iter_stage_ablation(feature_sets, keypoint_version='V2', seed=42):
-    """Yield runs with each pipeline stage individually disabled, plus baseline."""
+def iter_stage_ablation(feature_sets, seed=42):
+    """Yield V2 runs with each ablatable stage individually disabled.
+
+    Stage ablation is V2-only by construction (the ablation corpora are
+    only generated for V2 keypoints).
+    """
     for fs in feature_sets:
-        # Baseline (full pipeline) - already covered by main_matrix but included
-        # here as an explicit member of the ablation series for self-contained
-        # analysis; the de-dup check will skip it if main_matrix ran first.
-        yield {
-            'feature_set': fs,
-            'keypoint_version': keypoint_version,
-            'pipeline_config': dict(DEFAULT_PIPELINE),
-            'augment': True,
-            'seed': seed,
-            'notes': 'stage_ablation_baseline',
-        }
-        for stage in PIPELINE_STAGES:
+        for stage in ABLATABLE_STAGES:
             cfg = dict(DEFAULT_PIPELINE)
             cfg[stage] = False
             yield {
                 'feature_set': fs,
-                'keypoint_version': keypoint_version,
+                'keypoint_version': 'V2',
                 'pipeline_config': cfg,
                 'augment': True,
                 'seed': seed,
@@ -216,10 +295,10 @@ def main():
                         help='Which sweep to run')
     parser.add_argument('--feature_set', action='append', default=None,
                         help='Restrict to specific feature_set(s). Repeatable. '
-                             'Default: all eight for `main`, top performers '
-                             'for the ablations.')
+                             'Default: all eight feature sets.')
     parser.add_argument('--keypoint_version', action='append', default=None,
-                        help="Restrict to V1 / V2. Repeatable. Default: both.")
+                        help="Restrict to V1 / V2. Repeatable. "
+                             "Default: both for `main`, V2 only for ablations.")
     parser.add_argument('--seed', type=int, action='append', default=None,
                         help='Override seed list. Repeatable.')
     parser.add_argument('--results_file', type=str, default='results.jsonl')
@@ -240,18 +319,18 @@ def main():
     runs = []
     if args.mode in ('main', 'all'):
         runs.extend(iter_main_matrix(feature_sets, keypoint_versions, seeds))
-    if args.mode == 'stage_ablation':
-        # Default to top performers if no explicit feature_set given
-        fs_for_ablation = (args.feature_set or ['v7', 'v5'])
-        runs.extend(iter_stage_ablation(fs_for_ablation))
+    if args.mode in ('stage_ablation', 'all'):
+        runs.extend(iter_stage_ablation(feature_sets))
     if args.mode in ('aug_ablation', 'all'):
-        fs_for_aug = (args.feature_set or ['v7', 'v5', 'v2'])
-        runs.extend(iter_aug_ablation(fs_for_aug))
+        runs.extend(iter_aug_ablation(feature_sets))
     if args.mode in ('seed_stability', 'all'):
+        # Default seed_stability to v5/v7 only unless feature_sets explicitly
+        # given, since this mode is intended to bound noise on the top
+        # performers rather than on every variant.
         fs_for_stab = (args.feature_set or ['v7', 'v5'])
         runs.extend(iter_seed_stability(fs_for_stab))
 
-    # Skip ones already done
+    # Skip combinations already done
     existing = load_existing_results(RESULTS_FILE)
     print(f"Loaded {len(existing)} existing records from {RESULTS_FILE}")
 

@@ -428,7 +428,7 @@ class KeyPointValidator:
             last_with_both=last_with_both,
             last_hand=last_hand,
             length_with_both=length_with_both,
-            lenth_with_hands=length_with_hands
+            length_with_hands=length_with_hands
         )
 
     def findNonMissingValueClusters(self):

@@ -122,7 +122,7 @@ class FeatureExtraction:
             # Calculate intra-hand angles for left hand
             if left_landmarks is not None and len(left_landmarks) >= 21:
                 for p1, joint, p2 in intra_hand_angles:
-                    angle = self._calculate_angle(left_landmarks[p1],
+                    angle = self._calculateAngle(left_landmarks[p1],
                                                   left_landmarks[joint],
                                                   left_landmarks[p2])
                     frame_angles.append(angle)
@@ -132,7 +132,7 @@ class FeatureExtraction:
             # Calculate intra-hand angles for right hand
             if right_landmarks is not None and len(right_landmarks) >= 21:
                 for p1, joint, p2 in intra_hand_angles:
-                    angle = self._calculate_angle(right_landmarks[p1],
+                    angle = self._calculateAngle(right_landmarks[p1],
                                                   right_landmarks[joint],
                                                   right_landmarks[p2])
                     frame_angles.append(angle)
@@ -143,7 +143,7 @@ class FeatureExtraction:
             if (left_landmarks is not None and right_landmarks is not None and
                     len(left_landmarks) >= 21 and len(right_landmarks) >= 21):
                 for left_idx, right_idx in inter_hand_pairs:
-                    angle = self._calculate_angle(left_landmarks[left_idx],
+                    angle = self._calculateAngle(left_landmarks[left_idx],
                                                   # left wrist as reference
                                                   left_landmarks[0],
                                                   right_landmarks[right_idx])
@@ -187,9 +187,9 @@ class FeatureExtraction:
         All proximity features (8610) + All angle features (480) = 9090 total inputs.
         Verbose approach for baseline accuracy comparison.
         '''
-        proximity = self.extract_proximity_features(
+        proximity = self.extractProximityFeatures(
             json_obj, include_labels=False)
-        angles = self.extract_angle_features(json_obj, include_labels=False)
+        angles = self.extractAngleFeatures(json_obj, include_labels=False)
 
         proximity = np.array(proximity)
         angles = np.array(angles)
@@ -205,7 +205,7 @@ class FeatureExtraction:
 
     def extract_feature_set_2_proximity_only(self, json_obj):
         '''Feature Set 2: Only proximity features (8610 inputs).'''
-        proximity = self.extract_proximity_features(
+        proximity = self.extractProximityFeatures(
             json_obj, include_labels=False)
 
         result = []
@@ -225,7 +225,7 @@ class FeatureExtraction:
         features = []
 
         # Extract angle features once for all frames
-        angles = self.extract_angle_features(json_obj, include_labels=False)
+        angles = self.extractAngleFeatures(json_obj, include_labels=False)
 
         for frame_idx, frame in enumerate(frames):
             frame_features = []
@@ -317,9 +317,9 @@ class FeatureExtraction:
                     for j, idx2 in enumerate(key_indices):
                         for k, idx3 in enumerate(key_indices):
                             if i < j < k:
-                                angle_l = self._calculate_angle(
+                                angle_l = self._calculateAngle(
                                     left_landmarks[idx1], left_landmarks[idx2], left_landmarks[idx3])
-                                angle_r = self._calculate_angle(
+                                angle_r = self._calculateAngle(
                                     right_landmarks[idx1], right_landmarks[idx2], right_landmarks[idx3])
                                 frame_features.extend(
                                     [float(angle_l), float(angle_r)])
@@ -519,13 +519,13 @@ class FeatureExtraction:
     def extractAllProximityFeatures(self):
         self.features = []
         for json_obj in self.corpus:
-            self.features.append(self.extract_proximity_features(json_obj))
+            self.features.append(self.extractProximityFeatures(json_obj))
         return self.features
 
     def extractAllAngleFeatures(self):
         features = []
         for json_obj in self.corpus:
-            features.append(self.extract_angle_features(json_obj))
+            features.append(self.extractAngleFeatures(json_obj))
         return features
 
     def extract_all_feature_set_1(self):

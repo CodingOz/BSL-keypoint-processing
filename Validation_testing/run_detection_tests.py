@@ -249,7 +249,7 @@ class RunDetectionTests:
 
 
         'position_and_filled_movement_and_acceleration': lambda det, **p: (
-            det.position_and_filled_movement_and_acceleration_anomalys(**p)
+            det.positionAndFilledMovementAndAccelerationAnomalies(**p)
         ),
 
         'appearance_disappearance': lambda det, **p: (

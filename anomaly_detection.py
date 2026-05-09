@@ -294,28 +294,28 @@ class AnomalyDetection():
         right = set(movement[1]) | set(posision[1])
         return list(sorted(left)), list(sorted(right))
 
-    def posisionAndFilledMovmentAnomalysByStdDev(self,
-                                                 position_threshold=-0.15,
-                                                 movement_threshole=0.15,
-                                                 gap_size=5,
-                                                 num_std_dev=1.5):
-        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev,
-                                                       gap_size=gap_size)
-        posision = self.posisionAnomalys(threshold=position_threshold)
+    def positionAndFilledMovementAnomaliesByStdDev(self,
+                                                   position_threshold=-0.15,
+                                                   movement_threshole=0.15,
+                                                   gap_size=5,
+                                                   num_std_dev=1.5):
+        movement = self.filledMovementAnomaliesByStdDev(num_std_dev=num_std_dev,
+                                                         gap_size=gap_size)
+        posision = self.positionAnomalies(threshold=position_threshold)
 
         left = set(movement[0]) | set(posision[0])
 
         right = set(movement[1]) | set(posision[1])
         return list(sorted(left)), list(sorted(right))
 
-    def posisionAndFilledMovmentAnomalysByMAD(self,
-                                              position_threshold=-0.15,
-                                              movement_threshole=0.15,
+    def positionAndFilledMovementAnomaliesByMAD(self,
+                                                 position_threshold=-0.15,
+                                                 movement_threshole=0.15,
                                               threshold=1.0,
                                               gap_size=5):
-        movement = self.filledMovementAnomalysByMAD(threshold=threshold,
-                                                    gap_size=gap_size)
-        posision = self.posisionAnomalys(threshold=position_threshold)
+        movement = self.filledMovementAnomaliesByMAD(threshold=threshold,
+                                                     gap_size=gap_size)
+        posision = self.positionAnomalies(threshold=position_threshold)
 
         left = set(movement[0]) | set(posision[0])
 
@@ -327,9 +327,9 @@ class AnomalyDetection():
                                                      movement_threshole=0.15,
                                                      percentile=95,
                                                      gap_size=5):
-        movement = self.filledMovementAnomalysByPercentile(
+        movement = self.filledMovementAnomaliesByPercentile(
             percentile=percentile, gap_size=gap_size)
-        posision = self.posisionAnomalys(threshold=position_threshold)
+        posision = self.positionAnomalies(threshold=position_threshold)
 
         left = set(movement[0]) | set(posision[0])
 
@@ -340,9 +340,9 @@ class AnomalyDetection():
                                                      position_threshold=-0.15,
                                                      num_std_dev=2.0,
                                                      gap_size=5):
-        movement = self.filledMovementAnomalysByStdDev(num_std_dev=num_std_dev,
-                                                       gap_size=gap_size)
-        posision = self.posisionAnomalys(threshold=position_threshold)
+        movement = self.filledMovementAnomaliesByStdDev(num_std_dev=num_std_dev,
+                                                         gap_size=gap_size)
+        posision = self.positionAnomalies(threshold=position_threshold)
 
         left = set(movement[0]) & set(posision[0])
         right = set(movement[1]) & set(posision[1])
@@ -579,13 +579,13 @@ class AnomalyDetection():
             gap_size=5,
             inclusive=True,
             interpolate_missing=False):
-        movement = self.filledMovementAnomalys(
+        movement = self.filledMovementAnomalies(
             gap_size=gap_size, threshold=movement_threshold)
         acceleration = self.AccelerationAnomalys(
             threshold=acceleration_threshold,
             inclusive=inclusive,
             interpolate_missing=interpolate_missing)
-        position = self.posisionAnomalys(threshold=position_threshold)
+        position = self.positionAnomalies(threshold=position_threshold)
 
         left = set(movement[0]) | set(position[0]) | set(acceleration[0])
         right = set(movement[1]) | set(position[1]) | set(acceleration[1])

@@ -1,0 +1,18 @@
+{
+  "corpus_name": "v5_12points_distances_only_660",
+  "total_files": 347,
+  "features_per_file": 660,
+  "signs": [
+    "I",
+    "J",
+    "N",
+    "U",
+    "P",
+    "S",
+    "A",
+    "O",
+    "T",
+    "E",
+    "B"
+  ]
+}
