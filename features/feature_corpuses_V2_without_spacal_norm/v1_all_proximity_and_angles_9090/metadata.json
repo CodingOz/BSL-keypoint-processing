@@ -1,18 +1,18 @@
 {
   "corpus_name": "v1_all_proximity_and_angles_9090",
-  "total_files": 347,
+  "total_files": 327,
   "features_per_file": 9090,
   "signs": [
-    "I",
-    "J",
-    "N",
-    "U",
     "P",
-    "S",
-    "A",
-    "O",
     "T",
+    "N",
+    "S",
+    "B",
+    "O",
     "E",
-    "B"
+    "J",
+    "A",
+    "I",
+    "U"
   ]
 }

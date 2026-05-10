@@ -655,7 +655,7 @@
     }
   },
   "normalisation": {
-    "method": "pchip_uniform",
+    "method": "pchip_uniform_nan_robust",
     "frame_num": 10,
     "source_total_frames": 108,
     "compression_ratio": 10.8

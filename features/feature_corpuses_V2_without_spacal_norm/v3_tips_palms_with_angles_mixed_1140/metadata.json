@@ -1,18 +1,18 @@
 {
   "corpus_name": "v3_tips_palms_with_angles_mixed_1140",
-  "total_files": 347,
+  "total_files": 327,
   "features_per_file": 1140,
   "signs": [
-    "I",
-    "J",
-    "N",
-    "U",
     "P",
-    "S",
-    "A",
-    "O",
     "T",
+    "N",
+    "S",
+    "B",
+    "O",
     "E",
-    "B"
+    "J",
+    "A",
+    "I",
+    "U"
   ]
 }

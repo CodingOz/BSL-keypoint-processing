@@ -1,18 +1,18 @@
 {
   "corpus_name": "v0_raw_coordinates_84",
-  "total_files": 347,
+  "total_files": 327,
   "features_per_file": 840,
   "signs": [
-    "I",
-    "J",
-    "N",
-    "U",
     "P",
-    "S",
-    "A",
-    "O",
     "T",
+    "N",
+    "S",
+    "B",
+    "O",
     "E",
-    "B"
+    "J",
+    "A",
+    "I",
+    "U"
   ]
 }
