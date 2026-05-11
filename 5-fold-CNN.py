@@ -1,7 +1,17 @@
 """
-1D CNN with Stratified K-Fold Cross-Validation for BSL Sign Classification.
-Architecture: 1D convolutions along the temporal axis (10 frames).
-Features are treated as input channels, time as the spatial dimension.
+1D CNN with k-fold cross-validation for BSL sign classification.
+
+Cross-validation modes:
+* `stratified` (default): stratified K-fold on samples, preserving the per-class
+  distribution within each fold. Used for the headline cross-feature-set
+  comparison and all stage/aug ablations.
+* `signer_disjoint`: leave-one-signer-out cross-validation, in which each fold's
+  validation set is all recordings from a single signer and the training set is
+  all recordings from the remaining signers. Used to measure the accuracy drop
+  between within-signer and signer-independent generalisation.
+
+Architecture: 1D convolutions along the temporal axis (10 frames). Features are
+treated as input channels, time as the spatial dimension.
 """
 import json
 import argparse
@@ -9,7 +19,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import classification_report, confusion_matrix
 import copy
@@ -244,20 +254,71 @@ def _measure_inference_time(model, val_loader, device, n_warmup=3, n_runs=10):
     return (elapsed / (n_runs * total_samples)) * 1000.0
 
 
-def load_corpus(path):
-    """Load corpus_data.json and return features array + label array."""
+def _extract_signer_id(sample):
+    """Extract a stable signer identifier from a corpus sample.
+
+    The corpus generator records the source JSON filename per sample under
+    the 'filename' field. The filename stem is the signer ID by construction:
+    each participant submitted recordings under a single UUID, so the same
+    stem appearing under multiple sign-letter folders represents the same
+    signer recording different letters, and distinct stems represent
+    distinct signers (the 'manual-N' files included). This function
+    therefore prefers an explicit 'signer_id' field if the corpus has been
+    regenerated with one, but falls back to deriving the ID from 'filename'
+    on existing corpora.
+    """
+    # Prefer an explicit signer_id field if present.
+    for key in ('signer_id', 'participant_id', 'source_uuid', 'uuid'):
+        if key in sample and sample[key] is not None:
+            return str(sample[key])
+    meta = sample.get('metadata') or {}
+    for key in ('signer_id', 'participant_id', 'source_uuid', 'uuid'):
+        if key in meta and meta[key] is not None:
+            return str(meta[key])
+    # Fall back to deriving from the filename stem, which the corpus
+    # generator already records per sample.
+    if 'filename' in sample and sample['filename']:
+        stem = os.path.splitext(str(sample['filename']))[0]
+        if stem:
+            return stem
+    return None
+
+
+def load_corpus(path, require_signer_id=False):
+    """Load corpus_data.json and return (features, labels, signer_ids).
+
+    `signer_ids` is a 1D array of strings of length N. If require_signer_id is
+    True and any sample lacks a signer identifier, an informative error is
+    raised. If require_signer_id is False, missing signer IDs are returned as
+    None entries in the array, and the caller is free to ignore them when
+    signer information is not needed.
+    """
     with open(path, 'r') as f:
         data = json.load(f)
 
-    features = []  # will be (N, frames, feats_per_frame)
+    features = []
     labels = []
+    signer_ids = []
+    missing = 0
 
     for sample in data:
         features.append(sample['features'])
         labels.append(sample['sign'])
+        sid = _extract_signer_id(sample)
+        if sid is None:
+            missing += 1
+        signer_ids.append(sid)
 
-    features = np.array(features, dtype=np.float32)  # (N, frames, feats)
-    return features, np.array(labels)
+    if require_signer_id and missing > 0:
+        raise ValueError(
+            f"Signer-disjoint cross-validation requested, but {missing} of "
+            f"{len(data)} samples in {path} have no recoverable signer ID. "
+            f"The corpus generator needs to record one of "
+            f"'signer_id', 'participant_id', 'source_uuid', or 'uuid' "
+            f"per sample (top-level or under 'metadata').")
+
+    features = np.array(features, dtype=np.float32)
+    return features, np.array(labels), np.array(signer_ids, dtype=object)
 
 
 def prepare_fold(X_all, y_encoded, train_idx, val_idx):
@@ -265,11 +326,9 @@ def prepare_fold(X_all, y_encoded, train_idx, val_idx):
     Scale features per-fold (fit on train, transform both).
     Transpose to (N, channels, time) for Conv1D.
     """
-    # X_all shape: (N, frames, features_per_frame)
     n_frames = X_all.shape[1]
     n_feats = X_all.shape[2]
 
-    # Flatten frames × features for scaling, then reshape back
     X_train_flat = X_all[train_idx].reshape(len(train_idx), -1)
     X_val_flat = X_all[val_idx].reshape(len(val_idx), -1)
 
@@ -280,11 +339,44 @@ def prepare_fold(X_all, y_encoded, train_idx, val_idx):
     X_train = X_train_flat.reshape(len(train_idx), n_frames, n_feats)
     X_val = X_val_flat.reshape(len(val_idx), n_frames, n_feats)
 
-    # Transpose to (N, features, frames) and features become Conv1D channels
-    X_train = X_train.transpose(0, 2, 1)  # (N, feats, frames)
+    X_train = X_train.transpose(0, 2, 1)
     X_val = X_val.transpose(0, 2, 1)
 
     return X_train, X_val
+
+
+def _build_splits(cv_mode, X_all, y_encoded, signer_ids, n_folds, seed):
+    """Construct the iterable of (train_idx, val_idx) pairs for the chosen mode.
+
+    Returns a tuple (splits, n_folds_actual, fold_id_func) where:
+    * splits is the iterator of (train_idx, val_idx) pairs.
+    * n_folds_actual is the number of folds the iterator will yield (for
+      stratified this is the requested n_folds; for signer_disjoint it is the
+      number of distinct signers).
+    * fold_id_func(fold_index, val_idx) returns a human-readable fold label
+      (the signer ID for signer_disjoint, the fold number for stratified).
+    """
+    if cv_mode == 'stratified':
+        skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+        splits = list(skf.split(X_all, y_encoded))
+        return splits, len(splits), lambda i, vi: f"fold_{i + 1}"
+    if cv_mode == 'signer_disjoint':
+        if signer_ids is None or all(s is None for s in signer_ids):
+            raise ValueError(
+                "signer_disjoint requested but no signer IDs are available. "
+                "Re-run load_corpus with require_signer_id=True.")
+        logo = LeaveOneGroupOut()
+        splits = list(logo.split(X_all, y_encoded, groups=signer_ids))
+        # Map each fold index to the held-out signer ID.
+        fold_signers = []
+        for _, val_idx in splits:
+            held_out_signer = signer_ids[val_idx[0]] if len(val_idx) else 'unknown'
+            fold_signers.append(held_out_signer)
+
+        def _label(i, vi):
+            return f"signer:{fold_signers[i]}"
+        return splits, len(splits), _label
+    raise ValueError(f"Unknown cv_mode: {cv_mode}")
 
 
 def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
@@ -294,8 +386,9 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
               experiment_tag=None, results_file=None,
               noise_std=0.03, time_shift_max=1, scale_range=(0.95, 1.05),
               scheduler_factor=0.5, scheduler_patience=7,
+              cv_mode='stratified',
               notes=''):
-    """Run stratified k-fold cross-validation.
+    """Run k-fold cross-validation under the chosen `cv_mode`.
 
     Returns the structured result record (also appended to results_file if set).
     """
@@ -306,8 +399,9 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}\n")
 
-    # Load data
-    X_all, y_raw = load_corpus(corpus_path)
+    require_signer_id = (cv_mode == 'signer_disjoint')
+    X_all, y_raw, signer_ids = load_corpus(
+        corpus_path, require_signer_id=require_signer_id)
     le = LabelEncoder()
     y_encoded = le.fit_transform(y_raw)
     class_names = list(le.classes_)
@@ -316,7 +410,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
     n_classes = len(class_names)
 
     feature_set_full_name = os.path.basename(os.path.dirname(corpus_path))
-    # Conventional short ID: leading "vN" token of the corpus folder name
     feature_set_short = (feature_set_full_name.split('_')[0]
                          if feature_set_full_name else 'unknown')
 
@@ -325,17 +418,31 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         for cls, count in zip(*np.unique(y_raw, return_counts=True))
     }
 
+    # Signer-level distribution metadata for record provenance
+    if cv_mode == 'signer_disjoint':
+        unique_signers = [s for s in np.unique(signer_ids) if s is not None]
+        signer_distribution = {
+            str(sid): int(np.sum(signer_ids == sid)) for sid in unique_signers
+        }
+    else:
+        signer_distribution = None
+
     print(f"Corpus: {feature_set_full_name}")
     print(f"Samples: {n_samples}  |  Frames: {n_frames}  |  "
           f"Features/frame: {n_feats}  |  Classes: {n_classes}")
     print(f"Class distribution: {class_distribution}")
+    if cv_mode == 'signer_disjoint':
+        print(f"Signers: {len(signer_distribution)}  |  Distribution: "
+              f"{signer_distribution}")
     print(f"Model input shape: (batch, {n_feats}, {n_frames})")
     print(f"Augmentation: {'ON' if augment else 'OFF'}")
+    print(f"CV mode: {cv_mode}")
     print(f"Seed: {seed}")
     print("=" * 70)
 
-    # K-Fold setup - seed flows through to make the split reproducible
-    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+    # Build fold splits according to the requested mode
+    splits, n_folds_actual, fold_label = _build_splits(
+        cv_mode, X_all, y_encoded, signer_ids, n_folds, seed)
 
     fold_results = []
     all_val_preds = np.zeros(n_samples, dtype=int)
@@ -346,10 +453,10 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
     inference_times = []
     peak_gpu_mb_per_fold = []
 
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X_all, y_encoded)):
-        print(f"\n{'─' * 30} Fold {fold + 1}/{n_folds} {'─' * 30}")
-        print(
-            f"Train: {len(train_idx)} samples  |  Val: {len(val_idx)} samples")
+    for fold, (train_idx, val_idx) in enumerate(splits):
+        label = fold_label(fold, val_idx)
+        print(f"\n{'─' * 30} Fold {fold + 1}/{n_folds_actual} ({label}) {'─' * 30}")
+        print(f"Train: {len(train_idx)} samples  |  Val: {len(val_idx)} samples")
 
         if device.type == 'cuda':
             torch.cuda.reset_peak_memory_stats(device)
@@ -373,7 +480,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
             drop_last=False)
         val_loader = DataLoader(val_ds, batch_size=len(val_idx))
 
-        # build model
         model = BSLConv1DNet(in_channels=n_feats, num_classes=n_classes,
                              dropout=dropout).to(device)
         if n_parameters is None:
@@ -388,7 +494,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         )
         stopper = EarlyStopping(patience=patience)
 
-        # Training loop
         best_val_acc = 0.0
         for epoch in range(1, n_epochs + 1):
             train_loss, train_acc = train_one_epoch(
@@ -414,7 +519,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
                     f"(best val_loss={stopper.best_loss:.4f})")
                 break
 
-        # Evaluate best model for this fold
         model.load_state_dict(stopper.best_model)
         _, final_acc, final_preds, final_labels = evaluate(
             model, val_loader, criterion, device
@@ -423,7 +527,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         all_val_preds[val_idx] = final_preds
         all_val_labels[val_idx] = final_labels
 
-        # Inference timing on this fold's validation loader
         try:
             inf_ms = _measure_inference_time(model, val_loader, device)
             inference_times.append(inf_ms)
@@ -437,17 +540,31 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
                 torch.cuda.max_memory_allocated(device) / (1024 ** 2)
             )
 
-        fold_results.append({
+        fold_record = {
             'fold': fold + 1,
+            'fold_label': label,
             'val_acc': float(final_acc),
             'stopped_epoch': int(epoch),
             'best_val_loss': float(stopper.best_loss),
             'fold_time_s': float(fold_elapsed),
-            # Sample-level predictions for downstream stats / failure analysis
+            'n_train': int(len(train_idx)),
+            'n_val': int(len(val_idx)),
             'sample_indices': [int(i) for i in val_idx],
             'predictions': [int(p) for p in final_preds],
             'true_labels': [int(t) for t in final_labels],
-        })
+        }
+        if cv_mode == 'signer_disjoint':
+            # Record the per-fold class coverage so per-fold accuracies can be
+            # interpreted in light of which classes the validation set
+            # contained. Some signers will not have recorded all 11 letters.
+            fold_class_counts = {
+                str(le.inverse_transform([cls])[0]):
+                    int(np.sum(y_encoded[val_idx] == cls))
+                for cls in np.unique(y_encoded[val_idx])
+            }
+            fold_record['val_class_distribution'] = fold_class_counts
+
+        fold_results.append(fold_record)
 
         print(f"\n  Fold {fold + 1} result: val_acc = {final_acc:.3f}  "
               f"(time: {fold_elapsed:.1f}s)")
@@ -460,21 +577,19 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
 
     accs = [r['val_acc'] for r in fold_results]
     for r in fold_results:
-        print(f"  Fold {r['fold']}: acc={r['val_acc']:.3f}  "
+        print(f"  {r['fold_label']}: acc={r['val_acc']:.3f}  "
               f"stopped_epoch={r['stopped_epoch']}  "
               f"best_val_loss={r['best_val_loss']:.4f}")
 
     print(f"\n  Mean accuracy: {np.mean(accs):.3f} ± {np.std(accs):.3f}")
     print(f"  Min: {np.min(accs):.3f}  Max: {np.max(accs):.3f}")
 
-    # Per-class report (aggregated across all folds)
     print(f"\n{'─' * 70}")
     print("PER-CLASS REPORT (aggregated across all folds)")
     print(f"{'─' * 70}")
     print(classification_report(all_val_labels, all_val_preds,
                                 target_names=class_names, digits=3))
 
-    # Confusion matrix
     cm = confusion_matrix(all_val_labels, all_val_preds)
     print("Confusion Matrix:")
     header = "      " + "  ".join(f"{c:>3}" for c in class_names)
@@ -483,7 +598,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         row_str = "  ".join(f"{v:3d}" for v in row)
         print(f"  {class_names[i]:>3}  {row_str}")
 
-    # Build the structured result record
     cls_report_dict = classification_report(
         all_val_labels, all_val_preds,
         target_names=class_names, output_dict=True, zero_division=0,
@@ -503,6 +617,7 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
     if experiment_tag is None:
         experiment_tag = (
             f"{feature_set_short}_kp{keypoint_version}"
+            f"_{cv_mode}"
             f"_{'aug' if augment else 'noaug'}_seed{seed}_{timestamp}"
         )
 
@@ -524,6 +639,8 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         'n_classes': int(n_classes),
         'n_samples': int(n_samples),
         'class_distribution': class_distribution,
+        'cv_mode': cv_mode,
+        'signer_distribution': signer_distribution,
 
         'pipeline_config': pipeline_config,
 
@@ -536,7 +653,8 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
         },
 
         'training': {
-            'n_folds': int(n_folds),
+            'cv_mode': cv_mode,
+            'n_folds': int(n_folds_actual),
             'max_epochs': int(n_epochs),
             'batch_size': int(batch_size),
             'optimiser': 'adam',
@@ -605,7 +723,15 @@ if __name__ == '__main__':
         description='1D CNN k-fold CV for BSL sign classification')
     parser.add_argument('--corpus', type=str, required=True,
                         help='Path to corpus_data.json')
-    parser.add_argument('--folds', type=int, default=5)
+    parser.add_argument('--folds', type=int, default=5,
+                        help='Number of folds (stratified mode only; ignored '
+                             'for signer_disjoint, which uses one fold per '
+                             'signer).')
+    parser.add_argument('--cv_mode', type=str, default='stratified',
+                        choices=['stratified', 'signer_disjoint'],
+                        help="Cross-validation mode. 'stratified' (default) "
+                             "is sample-level stratified k-fold; "
+                             "'signer_disjoint' is leave-one-signer-out.")
     parser.add_argument('--epochs', type=int, default=150)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=1e-3)
@@ -614,7 +740,6 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, default=15)
     parser.add_argument('--no_augment', action='store_true')
 
-    # Reproducibility / experiment metadata
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--keypoint_version', type=str, default='unknown',
                         help="Tag for the keypoint extraction version "
@@ -627,8 +752,6 @@ if __name__ == '__main__':
     parser.add_argument('--notes', type=str, default='',
                         help='Free-text annotation stored in the record.')
 
-    # Pipeline-config flags. Default to True (full pipeline).
-    # When running a stage-ablation, pass --no_<stage> to flip it off.
     parser.add_argument('--no_cleaning_10finger', action='store_true')
     parser.add_argument('--no_cleaning_mislabel', action='store_true')
     parser.add_argument('--no_interpolation', action='store_true')
@@ -636,7 +759,6 @@ if __name__ == '__main__':
     parser.add_argument('--no_temporal_normalisation', action='store_true')
     parser.add_argument('--no_spatial_normalisation', action='store_true')
 
-    # Augmentation hyperparameters (so they can be ablated cleanly)
     parser.add_argument('--noise_std', type=float, default=0.03)
     parser.add_argument('--time_shift_max', type=int, default=1)
     parser.add_argument('--scale_low', type=float, default=0.95)
@@ -671,5 +793,6 @@ if __name__ == '__main__':
         noise_std=args.noise_std,
         time_shift_max=args.time_shift_max,
         scale_range=(args.scale_low, args.scale_high),
+        cv_mode=args.cv_mode,
         notes=args.notes,
     )
