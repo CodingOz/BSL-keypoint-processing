@@ -160,7 +160,7 @@ class CorpusFeatureGenerator:
         print("CORPUS GENERATION: Creating 6 Feature Sets")
         print("=" * 70 + "\n")
  
-        corpuses = [{'name': 'v0_raw_coordinates_84',
+        corpuses = [{'name': 'v0_raw_coordinates_840',
                      'method': 'extract_feature_set_0_raw_coordinates',
                      'features': 840,
                      'description': 'Raw X and Y coordinates for each point'},

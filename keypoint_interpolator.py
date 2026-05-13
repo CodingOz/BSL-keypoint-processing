@@ -259,9 +259,36 @@ class KeypointInterpolator:
                 errors += 1
 
 
+import json, os
+
+def count_simultaneous_hands(corpus_root):
+    file_count = 0
+    total_frames = 0
+    total_simul_frames = 0
+    files_with_any = 0
+    for dirpath, _, fnames in os.walk(corpus_root):
+        for fname in fnames:
+            if not fname.lower().endswith('.json'):
+                continue
+            with open(os.path.join(dirpath, fname), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            md = data.get('metadata', {})
+            simul = md.get('simultaneous_hands_frames', [])
+            n_frames = md.get('frame_count', len(data.get('frames', [])))
+            file_count += 1
+            total_frames += n_frames
+            total_simul_frames += len(simul)
+            if simul:
+                files_with_any += 1
+    print(f"Files scanned:                 {file_count}")
+    print(f"Total frames:                  {total_frames}")
+    print(f"Simultaneous-hands frames:     {total_simul_frames}")
+    if file_count > 0:
+        print(f"Files affected (any):          {files_with_any} ({100*files_with_any/file_count:.1f}%)")
+        print(f"Frame-level prevalence:        {100*total_simul_frames/total_frames:.2f}%")
+
+    else:
+        print("No files found.")
+
 if __name__ == "__main__":
-    interpolate = KeypointInterpolator()
-    source_corpus = r'C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus'
-    target_corpus = r"C:\Users\Oscar Strong\Documents\GitHub\BSL-keypoint-processing\Validated_interpolated_SubCorpus_ends_estimated"
-    interpolate.estimateHandsEndsCorpusGenerator(
-        source_corpus, target_corpus, show_logs=True)
+    count_simultaneous_hands(r"C:\USERS\OSCAR STRONG\DOCUMENTS\GITHUB\BSL-KEYPOINT-PROCESSING\ALL_KEYPOINT_DATA\KEYPOINTS_V2_S1_CLEANED")

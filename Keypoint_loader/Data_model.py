@@ -1,12 +1,16 @@
+import numpy as np
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from Validators.keypoint_validator import (
     KeyPointValidator,
     KalmanKeyPointEstimator,
     CubicSplineKeyPointInterpolator,
 )
-import numpy as np
-import json
-import os
-import sys
+
 
 # Add parent directory to path to import KeyPointValidator
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

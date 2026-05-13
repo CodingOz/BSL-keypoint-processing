@@ -1,0 +1,297 @@
+
+Best params per method (metric=f1, side=combined):
+  movement_only                       {'threshold': 0.17}:  f1=0.3652
+  position_only                       {'threshold': -0.08}:  f1=0.5974
+  filled_movement                     {'threshold': 0.11, 'gap_size': 3}:  f1=0.5833  
+  ordering_palm_center_neighbour      {'margin': 0.08}:  f1=0.2245
+  ordering_wrist_neighbour            {'margin': 0.08}:  f1=0.2500
+  ordering_extremes_neighbour         {'margin': 0.0}:  f1=0.0769
+  ordering_palm_center_interpolation  {'margin': 0.08}:  f1=0.1860
+  ordering_wrist_interpolation        {'margin': 0.08}:  f1=0.1860
+  ordering_extremes_interpolation     {'margin': 0.0}:  f1=0.0769
+  filled_relative_mad                 {'threshold': 5.6, 'gap_size': 3}:  f1=0.1544   
+  filled_relative_percentile          {'percentile': 98, 'gap_size': 3}:  f1=0.3206   
+  filled_relative_stddev              {'num_std_dev': 2.4, 'gap_size': 3}:  f1=0.2819 
+  position_and_filled_movement        {'movement_threshole': 0.11, 'position_threshold': -0.08, 'gap_size': 2}:  f1=0.6420
+  position_and_filled_movement_by_stddev {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'num_std_dev': 2.3}:  f1=0.3313
+  position_and_filled_movement_by_mad {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'threshold': 5.6}:  f1=0.1924
+  position_and_filled_movement_by_percentile {'movement_threshole': 0.07, 'position_threshold': -0.08, 'gap_size': 3, 'percentile': 99}:  f1=0.4127
+  position_and_stddev_intersection    {'num_std_dev': 1.1, 'position_threshold': -0.02, 'gap_size': 3}:  f1=0.5915
+  ordering_palm_center_neighbour_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  f1=0.3437
+  ordering_wrist_neighbour_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  f1=0.3000
+  ordering_extremes_neighbour_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.0}:  f1=0.0769
+  ordering_palm_center_interpolation_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  f1=0.3051
+  ordering_wrist_interpolation_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  f1=0.3051
+  ordering_extremes_interpolation_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.0}:  f1=0.0769
+  ordering_palm_center_neighbour_stddev_union {'num_std_dev': 2.3, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.05}:  f1=0.2487
+  ordering_wrist_neighbour_stddev_union {'num_std_dev': 2.3, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.05}:  f1=0.2513
+  ordering_extremes_neighbour_stddev_union {'num_std_dev': 2.3, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.0}:  f1=0.2745
+  ordering_palm_center_interpolation_stddev_union {'num_std_dev': 2.3, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.0}:  f1=0.3776
+  ordering_wrist_interpolation_stddev_union {'num_std_dev': 2.3, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.01}:  f1=0.2360
+  ordering_extremes_interpolation_stddev_union {'num_std_dev': 2.3, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.0}:  f1=0.2745
+  acceleration_only                   {'threshold': 0.13}:  f1=0.1379
+  acceleration_only_inclusive         {'threshold': 0.14, 'inclusive': True}:  f1=0.1379
+  acceleration_only_interpolate       {'threshold': 0.14, 'interpolate_missing': False}:  f1=0.1379
+  position_and_filled_movement_and_acceleration {'position_threshold': -0.08, 'movement_threshold': 0.11, 'acceleration_threshold': 0.16, 'gap_size': 2}:  f1=0.6190        
+
+════════════════════════════════════════════════════════════════════════════════      
+Performance by Swap Size  (metric=f1, side=combined)
+Best configs selected by aggregate f1
+════════════════════════════════════════════════════════════════════════════════      
+
+  position_only  {'threshold': -0.08}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            14     16    0.467      13
+  2             6      8    0.429       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  filled_movement  {'threshold': 0.11, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            10     20    0.333      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  filled_relative_mad  {'threshold': 5.6, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            11     19    0.367      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  filled_relative_percentile  {'percentile': 98, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            10     20    0.333      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  filled_relative_stddev  {'num_std_dev': 2.4, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            10     20    0.333      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement  {'movement_threshole': 0.11, 'position_threshold': -0.08, 'gap_size': 2}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            15     15    0.500      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement_by_stddev  {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'num_std_dev': 2.3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            16     14    0.533      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement_by_mad  {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'threshold': 5.6}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            17     13    0.567      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement_by_percentile  {'movement_threshole': 0.07, 'position_threshold': -0.08, 'gap_size': 3, 'percentile': 99}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            15     15    0.500      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+════════════════════════════════════════════════════════════════════════════════      
+
+Best params per method (metric=recall, side=combined):
+  movement_only                       {'threshold': 0.15}:  recall=0.4400
+  position_only                       {'threshold': -0.06}:  recall=0.5000
+  filled_movement                     {'threshold': 0.09, 'gap_size': 3}:  recall=0.4200
+  ordering_palm_center_neighbour      {'margin': 0.06}:  recall=0.2200
+  ordering_wrist_neighbour            {'margin': 0.06}:  recall=0.2200
+  ordering_extremes_neighbour         {'margin': 0.0}:  recall=0.0400
+  ordering_palm_center_interpolation  {'margin': 0.06}:  recall=0.1600
+  ordering_wrist_interpolation        {'margin': 0.06}:  recall=0.1600
+  ordering_extremes_interpolation     {'margin': 0.0}:  recall=0.0400
+  filled_relative_mad                 {'threshold': 5.2, 'gap_size': 3}:  recall=0.4400
+  filled_relative_percentile          {'percentile': 96, 'gap_size': 3}:  recall=0.4200
+  filled_relative_stddev              {'num_std_dev': 2.1, 'gap_size': 3}:  recall=0.4200
+  position_and_filled_movement        {'movement_threshole': 0.1, 'position_threshold': -0.07, 'gap_size': 2}:  recall=0.5400
+  position_and_filled_movement_by_stddev {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'num_std_dev': 2.0}:  recall=0.5400
+  position_and_filled_movement_by_mad {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'threshold': 5.3}:  recall=0.5600
+  position_and_filled_movement_by_percentile {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 3, 'percentile': 97}:  recall=0.5400
+  position_and_stddev_intersection    {'num_std_dev': 1.1, 'position_threshold': -0.02, 'gap_size': 3}:  recall=0.4200
+  ordering_palm_center_neighbour_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  recall=0.2200
+  ordering_wrist_neighbour_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  recall=0.1800
+  ordering_extremes_neighbour_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.0}:  recall=0.0400
+  ordering_palm_center_interpolation_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  recall=0.1800
+  ordering_wrist_interpolation_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.003}:  recall=0.1800
+  ordering_extremes_interpolation_stddev_intersection {'num_std_dev': 1.2, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.0}:  recall=0.0400
+  ordering_palm_center_neighbour_stddev_union {'num_std_dev': 2.1, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.03}:  recall=0.4800
+  ordering_wrist_neighbour_stddev_union {'num_std_dev': 2.1, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.03}:  recall=0.4800
+  ordering_extremes_neighbour_stddev_union {'num_std_dev': 2.1, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.0}:  recall=0.4200
+  ordering_palm_center_interpolation_stddev_union {'num_std_dev': 2.1, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.0}:  recall=0.7400
+  ordering_wrist_interpolation_stddev_union {'num_std_dev': 2.1, 'position_threshold': -0.08, 'gap_size': 2, 'margin': 0.01}:  recall=0.4200
+  ordering_extremes_interpolation_stddev_union {'num_std_dev': 2.1, 'position_threshold': -0.08, 'gap_size': 4, 'margin': 0.0}:  recall=0.4200
+  acceleration_only                   {'threshold': 0.13}:  recall=0.0800
+  acceleration_only_inclusive         {'threshold': 0.14, 'inclusive': True}:  recall=0.0800
+  acceleration_only_interpolate       {'threshold': 0.14, 'interpolate_missing': True}:  recall=0.0800
+  position_and_filled_movement_and_acceleration {'position_threshold': -0.08, 'movement_threshold': 0.09, 'acceleration_threshold': 0.14, 'gap_size': 2}:  recall=0.5200    
+
+════════════════════════════════════════════════════════════════════════════════      
+Performance by Swap Size  (metric=recall, side=combined)
+Best configs selected by aggregate recall
+════════════════════════════════════════════════════════════════════════════════      
+
+  position_only  {'threshold': -0.06}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            16     14    0.533      13
+  2             6      8    0.429       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  filled_movement  {'threshold': 0.09, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            10     20    0.333      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  filled_relative_mad  {'threshold': 5.2, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            11     19    0.367      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  filled_relative_percentile  {'percentile': 96, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            10     20    0.333      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+
+  filled_relative_stddev  {'num_std_dev': 2.1, 'gap_size': 3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            10     20    0.333      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement  {'movement_threshole': 0.1, 'position_threshold': -0.07, 'gap_size': 2}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            16     14    0.533      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement_by_stddev  {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'num_std_dev': 2.0}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            16     14    0.533      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement_by_mad  {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 2, 'threshold': 5.3}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            17     13    0.567      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.
+
+  position_and_filled_movement_by_percentile  {'movement_threshole': 0.07, 'position_threshold': -0.07, 'gap_size': 3, 'percentile': 97}
+  Size         TP     FN   Recall   Files
+  ----------------------------------------
+  1            16     14    0.533      13
+  2             8      6    0.571       4
+  3             3      3    0.500       1
+  4             0      0    0.000       0
+  5             0      0    0.000       0
+
+  Note: precision/F1 per swap size omitted — FPs arise from clean frames
+        unattributable to any single swap. Use aggregate table for F1.

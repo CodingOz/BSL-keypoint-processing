@@ -387,6 +387,7 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
               noise_std=0.03, time_shift_max=1, scale_range=(0.95, 1.05),
               scheduler_factor=0.5, scheduler_patience=7,
               cv_mode='stratified',
+              save_models_dir=None,
               notes=''):
     """Run k-fold cross-validation under the chosen `cv_mode`.
 
@@ -524,6 +525,11 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
             model, val_loader, criterion, device
         )
 
+        if save_models_dir:
+            model_path = os.path.join(model_dir, f'fold_{fold+1}.pth')
+            torch.save(model.state_dict(), model_path)
+            print(f"  Model saved to {model_path}")
+
         all_val_preds[val_idx] = final_preds
         all_val_labels[val_idx] = final_labels
 
@@ -620,6 +626,12 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
             f"_{cv_mode}"
             f"_{'aug' if augment else 'noaug'}_seed{seed}_{timestamp}"
         )
+
+    model_dir = None
+    if save_models_dir:
+        model_dir = os.path.join(save_models_dir, experiment_tag)
+        os.makedirs(model_dir, exist_ok=True)
+        print(f"Models will be saved to {model_dir}")
 
     if pipeline_config is None:
         pipeline_config = {}
@@ -749,6 +761,10 @@ if __name__ == '__main__':
     parser.add_argument('--results_file', type=str, default='results.jsonl',
                         help='Path to JSONL file the result record is '
                              'appended to. Set to "" to disable.')
+    parser.add_argument('--save_models_dir', type=str, default=None,
+                        help='Directory to save trained models. If set, models '
+                             'will be saved as fold_N.pth in a subdirectory '
+                             'named after the experiment_tag.')
     parser.add_argument('--notes', type=str, default='',
                         help='Free-text annotation stored in the record.')
 
@@ -794,5 +810,6 @@ if __name__ == '__main__':
         time_shift_max=args.time_shift_max,
         scale_range=(args.scale_low, args.scale_high),
         cv_mode=args.cv_mode,
+        save_models_dir=args.save_models_dir,
         notes=args.notes,
     )
