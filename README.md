@@ -76,7 +76,25 @@ The repository is organised so that each pipeline stage lives in its own module 
 ├── Run_sweep.py                       (Sweep harness: drives 5-fold-CNN.py across the experimental matrix)
 │
 ├── Validators/                        (Validation infrastructure)
-│   └── keypoint_validator.py          (Sign-length detection, palm centres, momentum, anomaly signals)
+│   ├── keypoint_validator.py          (Sign-length detection, palm centres, momentum, anomaly signals)
+│   ├── corpus_validator.py            (Corpus-level statistics and GMM fitting for anomaly distributions)
+│   └── orientation_validator.py       (Rotation correction via ffprobe and hand-position heuristics)
+│
+├── Keypoint_loader/                   (Sprint 2 desktop visualiser, PySide6 MVC)
+│   ├── Display_points.py              (Launcher, entry point)
+│   ├── Data_model.py                  (Loads JSON, palm-centre overlays in real/Kalman/spline/PCHIP modes)
+│   ├── Graph_view.py                  (pyqtgraph 2D scatter with hover tooltips)
+│   ├── Main_window.py                 (Controls: file list, cluster filters, playback, palm mode)
+│   └── Playback.py                    (Speed-variable frame stepper)
+│
+├── BSL-survey/                        (Flask app for data collection)
+│   └── app/
+│       ├── __init__.py                (Flask + Talisman CSP + CSRF setup)
+│       ├── views.py                   (Routes: index, submit, success; sign list and tutorial URLs)
+│       ├── forms.py                   (Dynamic upload form with two-checkbox consent)
+│       ├── r2.py                      (Cloudflare R2 upload via boto3)
+│       ├── templates/                 (HTML templates)
+│       └── static/                    (Browser-side MediaPipe extraction, JS, embedded videos)
 │
 ├── All_keypoint_data/                 (Corpus storage at every pipeline stage)
 │   ├── keypoints_V2/                  (raw MediaPipe output, V2 extraction pass)
@@ -98,7 +116,6 @@ The repository is organised so that each pipeline stage lives in its own module 
 ├── Validation_testing/                (Synthetic anomaly corpora and detector evaluation)
 ├── Model_Training/                    (Trained model snapshots and per-data-version results)
 ├── results/                           (Aggregate results.jsonl from sweep runs)
-├── BSL-survey/                        (Flask app for the data collection survey website)
 └── Unexpected behaviour/              (Documented MediaPipe failure cases by category)
 ```
 
@@ -118,7 +135,7 @@ The pipeline requires NumPy, SciPy, scikit-learn, PyTorch, Matplotlib, and PySid
 
 ### 2. Obtain the data
 
-The directory should contain one subfolder per letter class (A, B, E, I, J, N, O, P, S, T, U), each containing per-recording JSON files.
+Download `keypoints_V2.zip` and unzip it into `All_keypoint_data/`. The directory should contain one subfolder per letter class (A, B, E, I, J, N, O, P, S, T, U), each containing per-recording JSON files.
 
 ### 3. Run the processing pipeline
 
