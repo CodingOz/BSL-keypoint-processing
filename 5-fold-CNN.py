@@ -454,6 +454,20 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
     inference_times = []
     peak_gpu_mb_per_fold = []
 
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    if experiment_tag is None:
+        experiment_tag = (
+            f"{feature_set_short}_kp{keypoint_version}"
+            f"_{cv_mode}"
+            f"_{'aug' if augment else 'noaug'}_seed{seed}_{timestamp}"
+        )
+
+    model_save_path = None
+    if save_models_dir:
+        model_save_path = os.path.join(save_models_dir, experiment_tag)
+        os.makedirs(model_save_path, exist_ok=True)
+        print(f"Models will be saved to {model_save_path}")
+
     for fold, (train_idx, val_idx) in enumerate(splits):
         label = fold_label(fold, val_idx)
         print(f"\n{'─' * 30} Fold {fold + 1}/{n_folds_actual} ({label}) {'─' * 30}")
@@ -525,8 +539,8 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
             model, val_loader, criterion, device
         )
 
-        if save_models_dir:
-            model_path = os.path.join(model_dir, f'fold_{fold+1}.pth')
+        if model_save_path is not None:
+            model_path = os.path.join(model_save_path, f'fold_{fold+1}.pth')
             torch.save(model.state_dict(), model_path)
             print(f"  Model saved to {model_path}")
 
@@ -618,20 +632,6 @@ def run_kfold(corpus_path, n_folds=5, n_epochs=150, batch_size=16,
                 'f1': float(cls_report_dict[cls]['f1-score']),
                 'support': int(cls_report_dict[cls]['support']),
             }
-
-    timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    if experiment_tag is None:
-        experiment_tag = (
-            f"{feature_set_short}_kp{keypoint_version}"
-            f"_{cv_mode}"
-            f"_{'aug' if augment else 'noaug'}_seed{seed}_{timestamp}"
-        )
-
-    model_dir = None
-    if save_models_dir:
-        model_dir = os.path.join(save_models_dir, experiment_tag)
-        os.makedirs(model_dir, exist_ok=True)
-        print(f"Models will be saved to {model_dir}")
 
     if pipeline_config is None:
         pipeline_config = {}

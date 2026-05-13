@@ -118,7 +118,7 @@ The pipeline requires NumPy, SciPy, scikit-learn, PyTorch, Matplotlib, and PySid
 
 ### 2. Obtain the data
 
-Download `keypoints_V2.zip` and unzip it into `All_keypoint_data/`. The directory should contain one subfolder per letter class (A, B, E, I, J, N, O, P, S, T, U), each containing per-recording JSON files.
+The directory should contain one subfolder per letter class (A, B, E, I, J, N, O, P, S, T, U), each containing per-recording JSON files.
 
 ### 3. Run the processing pipeline
 
